@@ -586,16 +586,34 @@ export default function App() {
     console.log("⬇️ Download triggered (fallback)");
   };
 
-  const exportAsGPX = (
+  const exportAsGPX = async (
     waypointsData = waypoints,
     trackingData = trackingPoints,
     name = "route"
   ) => {
     const gpxContent = buildGPX(waypointsData, trackingData, name);
     const blob = new Blob([gpxContent], { type: "application/gpx+xml" });
+
+    // Try iOS share first, then fallback to download
+    if (navigator.canShare) {
+      const file = new File([blob], `${name}.gpx`, {
+        type: "application/gpx+xml",
+      });
+      try {
+        await navigator.share({
+          files: [file],
+          title: "GPX Route Export",
+        });
+        console.log("✅ GPX shared via iOS");
+        return;
+      } catch (err) {
+        console.warn("Share failed, using download fallback");
+      }
+    }
+
+    // Fallback download
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
-
     a.href = url;
     a.download = `${name}.gpx`;
     document.body.appendChild(a);
@@ -603,7 +621,7 @@ export default function App() {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
 
-    console.log("⬇️ Forced GPX download triggered");
+    console.log("⬇️ GPX download triggered");
   };
 
   const handleUndoLastWaypoint = () => {
@@ -748,6 +766,9 @@ export default function App() {
   };
 
   const handleEndSection = () => {
+    setSectionStarted(false);
+    setUndoTimeLeft(5);
+
     setSectionStarted(false);
     const sectionNameFormatted = `${todayDate}/Section ${sectionCount}`;
     const currentSection = { name: sectionNameFormatted, waypoints };

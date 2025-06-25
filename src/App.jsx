@@ -106,35 +106,57 @@ function calculateCumulativeDistance(waypoints, currentLat, currentLon) {
 
 function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
   const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="RallyMapper" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="RallyMapper" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
   <metadata>
     <name>${name}</name>
+    <desc>Rally route created with RallyMapper</desc>
     <time>${new Date().toISOString()}</time>
-  </metadata>
-`;
+  </metadata>`;
 
+  // Create waypoints as individual waypoints AND as a route
   const waypointEntries = waypoints
     .map(
-      (wp) => `
+      (wp, index) => `
   <wpt lat="${wp.lat}" lon="${wp.lon}">
-    <name>${wp.name}</name>
-    <desc>${wp.poi || ""}</desc>
-    <time>${wp.timestamp || new Date().toISOString()}</time>
+    <name>WP${index + 1}: ${wp.name}</name>
+    <desc>Distance: ${wp.distance}km${wp.poi ? " - " + wp.poi : ""}</desc>
+    <time>${new Date(wp.timestamp).toISOString()}</time>
+    <type>waypoint</type>
   </wpt>`
     )
     .join("");
+
+  // Create a route that connects all waypoints
+  const routeSection =
+    waypoints.length > 1
+      ? `
+  <rte>
+    <name>${name} - Route</name>
+    <desc>Rally route with ${waypoints.length} waypoints</desc>
+    ${waypoints
+      .map(
+        (wp, index) => `
+    <rtept lat="${wp.lat}" lon="${wp.lon}">
+      <name>WP${index + 1}: ${wp.name}</name>
+      <desc>Distance: ${wp.distance}km${wp.poi ? " - " + wp.poi : ""}</desc>
+    </rtept>`
+      )
+      .join("")}
+  </rte>`
+      : "";
 
   const trackingSegment =
     trackingPoints.length > 0
       ? `
   <trk>
-    <name>${name} - Auto Track</name>
+    <name>${name} - Track</name>
+    <desc>Auto-recorded GPS track</desc>
     <trkseg>
       ${trackingPoints
         .map(
           (pt) => `
       <trkpt lat="${pt.lat}" lon="${pt.lon}">
-        <time>${pt.timestamp}</time>
+        <time>${pt.timestamp || new Date().toISOString()}</time>
       </trkpt>`
         )
         .join("")}
@@ -145,7 +167,9 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
   const gpxFooter = `
 </gpx>`;
 
-  return gpxHeader + waypointEntries + trackingSegment + gpxFooter;
+  return (
+    gpxHeader + waypointEntries + routeSection + trackingSegment + gpxFooter
+  );
 }
 
 // KML export function (was missing)
@@ -624,6 +648,46 @@ export default function App() {
     console.log("⬇️ GPX download triggered");
   };
 
+  const exportAsKML = async (
+    waypointsData = waypoints,
+    trackingData = trackingPoints,
+    name = "route"
+  ) => {
+    const kmlContent = buildKML(waypointsData, trackingData, name);
+    const blob = new Blob([kmlContent], {
+      type: "application/vnd.google-earth.kml+xml",
+    });
+
+    // Try iOS share first, then fallback to download
+    if (navigator.canShare) {
+      const file = new File([blob], `${name}.kml`, {
+        type: "application/vnd.google-earth.kml+xml",
+      });
+      try {
+        await navigator.share({
+          files: [file],
+          title: "KML Route Export",
+        });
+        console.log("✅ KML shared via iOS");
+        return;
+      } catch (err) {
+        console.warn("KML share failed, using download fallback", err);
+      }
+    }
+
+    // Fallback download
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name}.kml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    console.log("⬇️ KML download triggered");
+  };
+
   const handleUndoLastWaypoint = () => {
     if (waypoints.length === 0) return;
 
@@ -741,28 +805,6 @@ export default function App() {
     if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
 
     console.log(`🗑️ Deleted ${selectedWaypoints.size} waypoints`);
-  };
-
-  const exportAsKML = (
-    waypointsData = waypoints,
-    trackingData = trackingPoints,
-    name = "route"
-  ) => {
-    const kmlContent = buildKML(waypointsData, trackingData, name);
-    const blob = new Blob([kmlContent], {
-      type: "application/vnd.google-earth.kml+xml",
-    });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-
-    a.href = url;
-    a.download = `${name}.kml`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-
-    console.log("⬇️ KML download triggered");
   };
 
   const handleEndSection = () => {

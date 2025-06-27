@@ -12,6 +12,59 @@ import JSZip from "jszip";
 import React, { useEffect, useRef, useState } from "react";
 import ReplayRoute from "./ReplayRoute";
 
+// Icon categories (merged cleanly)
+const iconCategories = {
+  Abbreviations: [
+    { name: "Keep to the left", src: "/icons/keep-left.svg" },
+    { name: "Keep to the right", src: "/icons/keep-right.svg" },
+    { name: "Keep straight", src: "/icons/keep-straight.svg" },
+    { name: "Left", src: "/icons/left.svg" },
+    { name: "Right", src: "/icons/right.svg" },
+    // { name: "Left and Right", src: "/icons/left_and_right.svg" },
+    // { name: "Right and Left", src: "/icons/right_and_left.svg" },
+    { name: "On Left", src: "/icons/on-left.svg" },
+    { name: "On Right", src: "/icons/on-right.svg" },
+    { name: "Bad", src: "/icons/bad.svg" },
+  ],
+  "On Track": [
+    { name: "Bump", src: "/icons/bump.svg" },
+    { name: "Bumpy", src: "/icons/bumpy.svg" },
+    // { name: "Bumpy Broken", src: "/icons/bumpy_broken.svg" },
+    { name: "Dip Hole", src: "/icons/dip-hole.svg" },
+    { name: "Ditch", src: "/icons/ditch.svg" },
+    { name: "Summit", src: "/icons/summit.svg" },
+    { name: "Hole", src: "/icons/hole.svg" },
+    { name: "Up hill", src: "/icons/uphill.svg" },
+    { name: "Down hill", src: "/icons/downhill.svg" },
+    { name: "Fence gate", src: "/icons/fence-gate.svg" },
+    { name: "Water crossing", src: "/icons/wading.svg" },
+    { name: "Grid", src: "/icons/grid.svg" },
+    { name: "Fence", src: "/icons/fence.svg" },
+    { name: "Rail road", src: "/icons/railroad.svg" },
+    { name: "Twisty", src: "/icons/twisty.svg" },
+    { name: "Tree", src: "/icons/tree_5.svg" },
+    { name: "Petrol Station", src: "/icons/petrol_station.svg" },
+  ],
+
+  Controls: [
+    { name: "Stop for Restart", src: "/icons/stop_for_restart.svg" },
+    {
+      name: "Arrive Selective Section",
+      src: "/icons/arrive_selective_section_flag.svg",
+    },
+  ],
+  Safety: [
+    { name: "Danger 1", src: "/icons/danger-1.svg" },
+    { name: "Danger 2", src: "/icons/danger-2.svg" },
+    { name: "Danger 3", src: "/icons/danger-3.svg" },
+    { name: "Stop", src: "/icons/stop.svg" },
+    { name: "Caution", src: "/icons/caution.svg" },
+  ],
+};
+
+// Flattened icon array for easier searching
+const allIcons = Object.values(iconCategories).flat();
+
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Earth's radius in km
@@ -66,6 +119,7 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
       (wp, index) => `
   <wpt lat="${wp.lat}" lon="${wp.lon}">
     <name>WP${index + 1}: ${wp.name}</name>
+    <desc>Distance: ${wp.distance}km${wp.poi ? " - " + wp.poi : ""}</desc>
     <time>${new Date(wp.timestamp).toISOString()}</time>
     <type>waypoint</type>
   </wpt>`
@@ -176,6 +230,9 @@ export default function App() {
   const [waypoints, setWaypoints] = useState([]);
   const [showReplay, setShowReplay] = useState(false);
   const waypointListRef = useRef(null);
+  const [activeCategory, setActiveCategory] = useState("Abbreviations");
+  const [selectedIcon, setSelectedIcon] = useState(null);
+  const [poi, setPoi] = useState("");
   const [recognitionActive, setRecognitionActive] = useState(false);
   const [currentGPS, setCurrentGPS] = useState(null);
   const [showMap, setShowMap] = useState(true);
@@ -388,6 +445,37 @@ export default function App() {
     setUndoTimeLeft(5);
   };
 
+  const handleIconSelect = (iconName) => {
+    setSelectedIcon(iconName);
+    setWaypoints((prev) => {
+      if (prev.length === 0) return prev;
+      const updated = [...prev];
+      const icon = allIcons.find((i) => i.name === iconName);
+      const last = { ...updated[updated.length - 1] };
+      last.name = icon?.name || iconName;
+      last.iconSrc = icon?.src || "";
+      updated[updated.length - 1] = last;
+      return updated;
+    });
+    if (navigator.vibrate) navigator.vibrate(30);
+  };
+
+  const updateLastWaypointIcon = (iconName) => {
+    const icon = allIcons.find((i) => i.name === iconName);
+    setWaypoints((prev) => {
+      const updated = [...prev];
+      const last = updated.length - 1;
+      if (last >= 0) {
+        updated[last] = {
+          ...updated[last],
+          name: icon?.name || iconName,
+          iconSrc: icon?.src,
+        };
+      }
+      return updated;
+    });
+  };
+
   const handleStartSection = () => {
     setSectionLoading(true);
     setSectionStarted(true);
@@ -492,300 +580,43 @@ export default function App() {
     recognition.start();
   };
 
-  const detectCategory = (description) => {
-    const text = description.toLowerCase();
-
-    // Multi-word pattern matching for better accuracy
-    const patterns = {
-      safety: [
-        /danger|hazard|warning|careful|watch|avoid|risk|unsafe/,
-        /severe|extreme|major|critical|emergency/,
-        /washout|bridge out|road closed|blocked/,
-      ],
-      navigation: [
-        /left|right|straight|turn|continue|bear|veer|fork|junction/,
-        /onto|into|towards|follow|take|keep/,
-        /road|track|path|lane|route/,
-      ],
-      surface: [
-        /bump|hole|rough|smooth|gravel|tarmac|concrete|dirt|mud|sand|washout|rut/,
-        /sealed|unsealed|bitumen|metal|loose|firm|soft|hard/,
-        /surface|condition|texture/,
-      ],
-      obstacle: [
-        /grid|gate|cattle|fence|barrier|bollard|post|sign/,
-        /wire|electric|wooden|metal|stock/,
-      ],
-      elevation: [
-        /hill|summit|peak|climb|descent|steep|uphill|downhill|crest|ridge/,
-        /up|down|rise|fall|gradient|slope/,
-      ],
-      crossing: [
-        /bridge|water|ford|creek|river|stream|crossing|splash/,
-        /culvert|causeway|low water/,
-      ],
-      landmark: [
-        /house|building|shed|barn|tower|mast|church|pub|shop|station/,
-        /tank|silo|windmill|monument|marker/,
-      ],
-      timing: [
-        /start|finish|checkpoint|control|timing|stage/,
-        /stop|restart|neutralisation/,
-      ],
-    };
-
-    // Score each category based on pattern matches
-    let bestCategory = "general";
-    let bestScore = 0;
-
-    for (const [category, categoryPatterns] of Object.entries(patterns)) {
-      let score = 0;
-      for (const pattern of categoryPatterns) {
-        if (pattern.test(text)) {
-          score += text.match(pattern) ? text.match(pattern).length : 0;
-        }
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestCategory = category;
-      }
-    }
-
-    console.log(
-      `📂 Category detected: "${text}" → ${bestCategory} (score: ${bestScore})`
-    );
-    return bestCategory;
-  };
-
-  const smartTextCorrection = (rawText) => {
-    let corrected = rawText.toLowerCase().trim();
-
-    // Common voice recognition errors for rally terms
-    const corrections = {
-      // Direction corrections
-      write: "right",
-      wright: "right",
-      rite: "right",
-      lift: "left",
-      laugh: "left",
-      strait: "straight",
-      "straight ahead": "straight",
-
-      // Rally-specific corrections
-      grade: "grid",
-      great: "grid",
-      greed: "grid",
-      "cattle guard": "grid",
-      "cattle grid": "grid",
-      summary: "summit",
-      submit: "summit",
-      sumit: "summit",
-      caution: "caution",
-      cation: "caution",
-      washout: "washout",
-      "wash out": "washout",
-      wash: "washout",
-
-      // Surface corrections
-      "gravel road": "gravel",
-      "tarmac road": "tarmac",
-      "sealed road": "tarmac",
-      "dirt road": "dirt",
-      unsealed: "gravel",
-
-      // Distance/measurement corrections
-      "next to k": "next 2k",
-      "next 2 k": "next 2k",
-      "next two k": "next 2k",
-      "for 1k": "for 1k",
-      "for one k": "for 1k",
-
-      // Common rally phrases
-      "turn left": "left turn",
-      "turn right": "right turn",
-      "keep going left": "keep left",
-      "keep going right": "keep right",
-      "carry straight": "keep straight",
-      "continue straight": "keep straight",
-    };
-
-    // Apply corrections
-    for (const [wrong, right] of Object.entries(corrections)) {
-      corrected = corrected.replace(new RegExp(wrong, "gi"), right);
-    }
-
-    return corrected;
-  };
-
-  const expandRallyTerms = (text) => {
-    let expanded = text;
-
-    // Common rally abbreviations and expansions
-    const expansions = {
-      // Directional
-      l: "left",
-      r: "right",
-      str: "straight",
-      kr: "keep right",
-      kl: "keep left",
-      ks: "keep straight",
-
-      // Rally features
-      cg: "cattle grid",
-      wg: "wire gate",
-      fg: "fence gate",
-      br: "bridge",
-      fd: "ford",
-      xing: "crossing",
-
-      // Surfaces
-      gr: "gravel",
-      tar: "tarmac",
-      conc: "concrete",
-      dt: "dirt",
-      rgh: "rough",
-      sth: "smooth",
-
-      // Hazards
-      dngr: "danger",
-      caut: "caution",
-      bump: "bump",
-      hole: "hole",
-      wo: "washout",
-
-      // Distances (preserve these exactly)
-      "1k": "1k",
-      "2k": "2k",
-      "3k": "3k",
-      "4k": "4k",
-      "5k": "5k",
-    };
-
-    // Apply expansions (whole words only)
-    for (const [abbrev, full] of Object.entries(expansions)) {
-      const regex = new RegExp(`\\b${abbrev}\\b`, "gi");
-      expanded = expanded.replace(regex, full);
-    }
-
-    return expanded;
-  };
-
-  const getSpeedContext = () => {
-    // Calculate current speed from recent tracking points
-    if (trackingPoints.length < 2) return "unknown";
-
-    const recent = trackingPoints.slice(-2);
-    const timeDiff =
-      (new Date(recent[1].timestamp) - new Date(recent[0].timestamp)) / 1000; // seconds
-    const distance =
-      parseFloat(
-        calculateDistance(
-          recent[0].lat,
-          recent[0].lon,
-          recent[1].lat,
-          recent[1].lon
-        )
-      ) * 1000; // meters
-
-    const speedMPS = distance / timeDiff; // meters per second
-    const speedKMH = speedMPS * 3.6; // km/h
-
-    if (speedKMH > 80) return "fast";
-    if (speedKMH > 40) return "medium";
-    if (speedKMH > 10) return "slow";
-    return "stationary";
-  };
-
-  const contextualProcessing = (text, speed) => {
-    let processed = text;
-
-    switch (speed) {
-      case "fast":
-        // High speed - prefer brief, essential info
-        processed = processed
-          .replace(/followed by/g, "→")
-          .replace(/next section/g, "next")
-          .replace(/approximately/g, "~");
-        break;
-
-      case "medium":
-        // Medium speed - standard processing
-        break;
-
-      case "slow":
-        // Low speed - can handle detailed descriptions
-        processed = processed
-          .replace(/→/g, "followed by")
-          .replace(/~/g, "approximately");
-        break;
-
-      default:
-        // Unknown speed - standard processing
-        break;
-    }
-
-    return processed;
-  };
-
   const processVoiceCommand = (transcript) => {
-    const cleanText = transcript.trim();
-    console.log("🗣️ Voice input:", cleanText);
+    const cleanText = transcript.toLowerCase().trim();
+    console.log("Processing voice command:", cleanText);
 
-    // Check for special commands first
-    if (cleanText.toLowerCase().includes("undo")) {
+    if (cleanText.startsWith("waypoint")) {
+      handleVoiceWaypoint(transcript);
+    } else if (cleanText.startsWith("poi")) {
+      handleVoicePOI(transcript);
+    } else if (cleanText.includes("undo")) {
       handleUndoLastWaypoint();
-      return;
-    }
-
-    if (
-      cleanText.toLowerCase().includes("section start") ||
-      cleanText.toLowerCase().includes("start section")
-    ) {
+    } else if (cleanText.includes("section start")) {
       handleStartSection();
-      return;
-    }
-
-    if (
-      cleanText.toLowerCase().includes("section end") ||
-      cleanText.toLowerCase().includes("end section")
-    ) {
+    } else if (cleanText.includes("section end")) {
       setShowEndSectionConfirm(true);
-      return;
+    } else {
+      // If no command prefix, treat as POI for last waypoint
+      handleVoicePOI(`POI ${transcript}`);
     }
-
-    // Everything else becomes a waypoint with natural description
-    handleNaturalWaypoint(cleanText);
   };
 
-  const handleNaturalWaypoint = (description) => {
+  const handleVoiceWaypoint = (transcript) => {
     if (!currentGPS) {
       setGpsError("No GPS signal available for waypoint.");
       return;
     }
 
-    if (!description || description.trim().length < 2) {
+    // Remove "waypoint" prefix and clean up description
+    const description = transcript.replace(/^waypoint\s+/i, "").trim();
+
+    if (!description) {
       setGpsError("Please provide a waypoint description.");
       return;
     }
 
-    // Step 1: Smart corrections for voice recognition errors
-    const corrected = smartTextCorrection(description);
-
-    // Step 2: Expand rally abbreviations
-    const expanded = expandRallyTerms(corrected);
-
-    // Step 3: Context-aware processing based on current speed
-    const speed = getSpeedContext();
-    const contextual = contextualProcessing(expanded, speed);
-
-    // Step 4: Final formatting
+    // Format the description
     const formattedName =
-      contextual.charAt(0).toUpperCase() + contextual.slice(1);
-
-    console.log(
-      `🧠 Smart processing: "${description}" → "${formattedName}" (speed: ${speed})`
-    );
+      description.charAt(0).toUpperCase() + description.slice(1);
 
     const timestamp = new Date().toLocaleTimeString();
     const cumulativeDistance = startGPS
@@ -799,12 +630,9 @@ export default function App() {
       timestamp,
       distance: cumulativeDistance,
       poi: "",
-      iconSrc: "",
-      category: detectCategory(formattedName),
-      voiceCreated: true,
-      rawTranscript: description,
-      processedText: formattedName, // Track the processing
-      speedContext: speed, // Track speed when created
+      iconSrc: "", // No icon for voice waypoints
+      category: detectCategory(description), // Auto-categorize
+      voiceCreated: true, // Flag for voice-created waypoints
     };
 
     setWaypoints((prev) => [...prev, waypoint]);
@@ -817,6 +645,78 @@ export default function App() {
     // Show undo option
     setShowUndo(true);
     setUndoTimeLeft(5);
+
+    console.log("✅ Voice waypoint added:", waypoint);
+  };
+
+  const handleVoicePOI = (transcript) => {
+    const description = transcript.replace(/^poi\s+/i, "").trim();
+
+    if (!description || waypoints.length === 0) {
+      setGpsError("No waypoint available for POI or empty description.");
+      return;
+    }
+
+    // Add POI to the most recent waypoint
+    setWaypoints((prevWaypoints) => {
+      const updated = [...prevWaypoints];
+      updated[updated.length - 1].poi = description;
+      return updated;
+    });
+
+    console.log("✅ Voice POI added:", description);
+  };
+
+  const detectCategory = (description) => {
+    const text = description.toLowerCase();
+
+    if (
+      text.includes("danger") ||
+      text.includes("hazard") ||
+      text.includes("warning")
+    ) {
+      return "safety";
+    }
+    if (
+      text.includes("left") ||
+      text.includes("right") ||
+      text.includes("straight") ||
+      text.includes("turn")
+    ) {
+      return "navigation";
+    }
+    if (
+      text.includes("bump") ||
+      text.includes("hole") ||
+      text.includes("rough") ||
+      text.includes("smooth")
+    ) {
+      return "surface";
+    }
+    if (
+      text.includes("grid") ||
+      text.includes("gate") ||
+      text.includes("cattle")
+    ) {
+      return "obstacle";
+    }
+    if (
+      text.includes("hill") ||
+      text.includes("summit") ||
+      text.includes("descent") ||
+      text.includes("climb")
+    ) {
+      return "elevation";
+    }
+    if (
+      text.includes("bridge") ||
+      text.includes("water") ||
+      text.includes("ford")
+    ) {
+      return "crossing";
+    }
+
+    return "general";
   };
 
   const exportAsJSON = async (
@@ -1780,24 +1680,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Voice Instructions */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-        <h3 className="font-semibold text-blue-800 mb-2">🎤 Voice Commands</h3>
-        <div className="text-sm text-blue-700 space-y-1">
-          <p>
-            <strong>Location:</strong> "Danger severe washout" • "Left turn onto
-            gravel" • "Summit followed by descent"
-          </p>
-          <p>
-            <strong>Controls:</strong> "Section start" • "Section end" • "Undo"
-          </p>
-          <p>
-            <strong>Tip:</strong> Speak naturally - any description becomes a
-            location marker!
-          </p>
-        </div>
-      </div>
-
       {/* Waypoint Entry */}
       <div>
         {/* Centered button + meter container */}
@@ -1805,8 +1687,8 @@ export default function App() {
           {/* KM Display */}
           <div
             style={{
-              width: "128px",
-              height: "24px",
+              width: "72px",
+              height: "18px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -1816,15 +1698,15 @@ export default function App() {
               borderRadius: "8px",
               fontWeight: "bold",
               boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-              padding: "16px",
+              padding: "4px",
             }}
           >
             <span
               style={{
-                fontSize: "1.5rem",
+                fontSize: "1.2rem",
                 textAlign: "center",
                 lineHeight: "1.2",
-                padding: "8px",
+                padding: "4px",
               }}
             >
               {totalDistance.toFixed(2)} km
@@ -1837,7 +1719,7 @@ export default function App() {
             type="button"
             disabled={!currentGPS || !sectionStarted}
             style={{
-              padding: "18px 16px",
+              padding: "4px 16px",
               borderRadius: "8px",
               // fontWeight: "600",
               fontSize: "1.0rem",
@@ -1860,15 +1742,14 @@ export default function App() {
             {waypointAdded ? <>✅ Added!</> : <>📍 Add Waypoint</>}
           </button>
 
-          {/* Undo Button - When Available */}
           {showUndo && (
             <button
               onClick={handleUndoLastWaypoint}
               type="button"
               style={{
-                padding: "16px 24px",
+                padding: "4px 16px",
                 borderRadius: "8px",
-                fontWeight: "600",
+                // fontWeight: "600",
                 fontSize: "1rem",
                 backgroundColor: "#EF4444",
                 color: "white",
@@ -1877,7 +1758,6 @@ export default function App() {
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
               }}
             >
               ↩️ Undo ({undoTimeLeft}s)
@@ -1885,42 +1765,25 @@ export default function App() {
           )}
 
           <button
+            style={{
+              padding: "4px 16px",
+              borderRadius: "6px",
+              fontSize: "1.0rem",
+              color: "black",
+              backgroundColor: recognitionActive ? "#FCA5A5" : "#D1D5DB",
+              border: "none",
+              cursor: "pointer",
+            }}
             onClick={startVoiceInput}
             type="button"
-            disabled={!sectionStarted}
-            style={{
-              padding: "18px 16px",
-              borderRadius: "12px",
-              //fontWeight: "600",
-              fontSize: "1.00rem",
-              transition: "all 0.2s",
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              backgroundColor: !sectionStarted
-                ? "#9CA3AF"
-                : recognitionActive
-                ? "#EF4444"
-                : "#2563EB",
-              color: "white",
-              cursor: !sectionStarted ? "not-allowed" : "pointer",
-              border: "none",
-              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-            }}
+            disabled={!sectionStarted || waypoints.length === 0}
           >
-            {recognitionActive ? (
-              <>
-                <div className="w-4 h-4 bg-white rounded-full animate-pulse"></div>
-                Listening...
-              </>
-            ) : (
-              <>🎤 Add Location</>
-            )}
+            🎤 {recognitionActive ? "Listening..." : "Voice Input"}
           </button>
 
           <button
             style={{
-              padding: "18px 16px",
+              padding: "4px 16px",
               borderRadius: "6px",
               fontSize: "1.0rem",
               backgroundColor: !sectionStarted ? "#E5E7EB" : "#D1D5DB",
@@ -1935,13 +1798,53 @@ export default function App() {
             📷 Photo
           </button>
 
-          {/* Tracking Status */}
           {isTracking && (
             <div className="flex items-center text-green-600 font-bold">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-ping mr-2"></div>
               📍 Tracking...
             </div>
           )}
+        </div>
+
+        <textarea
+          placeholder="Point of Interest (POI)"
+          className="w-full border p-2 rounded mb-2"
+          value={poi}
+          onChange={(e) => setPoi(e.target.value)}
+        />
+
+        <div className="flex flex-wrap gap-2 mb-2">
+          <div className="flex flex-wrap gap-5">
+            {Object.keys(iconCategories).map((category) => (
+              <button
+                key={category}
+                onClick={() => setActiveCategory(category)}
+                className={`px-3 py-1 rounded border-2 font-semibold transition duration-200 ease-in-out transform hover:scale-105 focus:outline-none ${
+                  activeCategory === category
+                    ? "bg-yellow-300 border-yellow-500 text-black shadow"
+                    : "bg-white border-gray-300 text-gray-600"
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-10 gap-2 mb-4">
+          {iconCategories[activeCategory].map((icon) => (
+            <button
+              key={icon.name}
+              onClick={() => handleIconSelect(icon.name)}
+              className={`w-20 h-20 flex flex-col items-center justify-center border-2 rounded-lg transition transform hover:scale-105 active:scale-95 ${
+                selectedIcon === icon.name
+                  ? "border-yellow-500 bg-yellow-100"
+                  : "border-gray-300 bg-white"
+              }`}
+            >
+              <img src={icon.src} alt={icon.name} className="w-8 h-8 mb-1" />
+              <p className="text-xs text-center font-medium">{icon.name}</p>
+            </button>
+          ))}
         </div>
 
         {/* Waypoints List */}

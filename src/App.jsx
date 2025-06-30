@@ -203,6 +203,7 @@ export default function App() {
   const [sectionLoading, setSectionLoading] = useState(false);
   const [showUndo, setShowUndo] = useState(false);
   const [undoTimeLeft, setUndoTimeLeft] = useState(5);
+  const [showVoiceInstructions, setShowVoiceInstructions] = useState(false); // Add this state
 
   // Map enhancement states
   const [mapType, setMapType] = useState("roadmap");
@@ -371,7 +372,7 @@ export default function App() {
       timestamp,
       distance: cumulativeDistance, // ✅ Use cumulative distance
       poi: "",
-      iconSrc: "",
+      //iconSrc: "",
     };
     setWaypoints((prev) => [...prev, waypoint]);
 
@@ -1780,28 +1781,44 @@ export default function App() {
         </div>
       </div>
 
-      {/* Voice Instructions */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-        <h3 className="font-semibold text-blue-800 mb-2">🎤 Voice Commands</h3>
-        <div className="text-sm text-blue-700 space-y-1">
-          <p>
-            <strong>Location:</strong> "Danger severe washout" • "Left turn onto
-            gravel" • "Summit followed by descent"
-          </p>
-          <p>
-            <strong>Controls:</strong> "Section start" • "Section end" • "Undo"
-          </p>
-          <p>
-            <strong>Tip:</strong> Speak naturally - any description becomes a
-            location marker!
-          </p>
-        </div>
+      {/* Voice Instructions - Collapsible */}
+      <div className="mb-4">
+        <button
+          onClick={() => setShowVoiceInstructions(!showVoiceInstructions)}
+          className="w-full bg-blue-50 border border-blue-200 rounded-lg p-2 text-left hover:bg-blue-100 transition-colors"
+        >
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-blue-800">🎤 Voice Commands</h3>
+            <span className="text-blue-600">
+              {showVoiceInstructions ? "▼" : "▶"}
+            </span>
+          </div>
+        </button>
+
+        {showVoiceInstructions && (
+          <div className="bg-blue-50 border-l border-r border-b border-blue-200 rounded-b-lg p-4">
+            <div className="text-sm text-blue-700 space-y-1">
+              <p>
+                <strong>Location:</strong> "Danger severe washout" • "Left turn
+                onto gravel" • "Summit followed by descent"
+              </p>
+              <p>
+                <strong>Controls:</strong> "Section start" • "Section end" •
+                "Undo"
+              </p>
+              <p>
+                <strong>Tip:</strong> Speak naturally - any description becomes
+                a location marker!
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Waypoint Entry */}
       <div>
         {/* Centered button + meter container */}
-        <div className="flex justify-center items-center gap-8 my-4">
+        <div className="flex justify-center items-center gap-4 my-4 flex-wrap">
           {/* KM Display */}
           <div
             style={{
@@ -1854,7 +1871,7 @@ export default function App() {
               color: "white",
               cursor:
                 !currentGPS || !sectionStarted ? "not-allowed" : "pointer",
-              border: "none",
+              border: "2px solid #1e3a8a",
             }}
           >
             {waypointAdded ? <>✅ Added!</> : <>📍 Add Waypoint</>}
@@ -1866,17 +1883,17 @@ export default function App() {
               onClick={handleUndoLastWaypoint}
               type="button"
               style={{
-                padding: "16px 24px",
+                padding: "18px 16px",
                 borderRadius: "8px",
-                fontWeight: "600",
+                // fontWeight: "600",
                 fontSize: "1rem",
                 backgroundColor: "#EF4444",
                 color: "white",
-                border: "none",
+                border: "2px solid #1e3a8a",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
+                gap: "12px",
                 boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
               }}
             >
@@ -1890,7 +1907,7 @@ export default function App() {
             disabled={!sectionStarted}
             style={{
               padding: "18px 16px",
-              borderRadius: "12px",
+              borderRadius: "8px",
               //fontWeight: "600",
               fontSize: "1.00rem",
               transition: "all 0.2s",
@@ -1898,13 +1915,13 @@ export default function App() {
               alignItems: "center",
               gap: "12px",
               backgroundColor: !sectionStarted
-                ? "#9CA3AF"
+                ? "#9ca3afda"
                 : recognitionActive
                 ? "#EF4444"
                 : "#2563EB",
               color: "white",
               cursor: !sectionStarted ? "not-allowed" : "pointer",
-              border: "none",
+              border: "2px solid #1e3a8a",
               boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
             }}
           >
@@ -1921,11 +1938,11 @@ export default function App() {
           <button
             style={{
               padding: "18px 16px",
-              borderRadius: "6px",
+              borderRadius: "8px",
               fontSize: "1.0rem",
               backgroundColor: !sectionStarted ? "#E5E7EB" : "#D1D5DB",
               color: "black",
-              border: "none",
+              border: "2px solid #1e3a8a",
               cursor: !sectionStarted ? "not-allowed" : "pointer",
             }}
             onClick={() => alert("Photo feature not yet implemented")}
@@ -2013,11 +2030,30 @@ export default function App() {
                     </div>
                   )}
                   <div className="flex items-center gap-2 mb-2">
-                    <img
-                      src={wp.iconSrc || "/icons/default.svg"}
-                      className="w-6 h-6"
-                      alt={wp.name}
-                    />
+                    {/* Only show icon if waypoint has an iconSrc */}
+                    {wp.iconSrc && (
+                      <img
+                        src={wp.iconSrc}
+                        className="w-6 h-6 mr-2"
+                        alt={wp.name}
+                      />
+                    )}
+                    {/* Show voice indicator for voice-created waypoints, icon for manual ones */}
+                    {wp.voiceCreated ? (
+                      <div className="w-6 h-6 flex items-center justify-center mr-2">
+                        <span className="text-blue-500">🎤</span>
+                      </div>
+                    ) : wp.iconSrc ? (
+                      <img
+                        src={wp.iconSrc}
+                        className="w-6 h-6 mr-2"
+                        alt={wp.name}
+                      />
+                    ) : (
+                      <div className="w-6 h-6 flex items-center justify-center mr-2">
+                        <span className="text-gray-400">📍</span>
+                      </div>
+                    )}
                     {editingWaypoint === idx ? (
                       <div className="flex-1 flex gap-2">
                         <input

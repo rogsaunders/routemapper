@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="KML to GPX Converter" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>Mount Barker Rally Route</name>
+    <desc>Converted from RallyMapper KML</desc>
+  </metadata>
+
+  <!-- Waypoints -->
+  <wpt lat="-35.025751168989906" lon="138.7539948066867">
+    <name>Street</name>
+    <desc></desc>
+  </wpt>
+  <wpt lat="-35.019281615703726" lon="138.75042116572848">
+    <name>Do what</name>
+    <desc></desc>
+  </wpt>
+  <wpt lat="-35.01045953434311" lon="138.75555222351238">
+    <name>Right turn</name>
+    <desc></desc>
+  </wpt>
+  <wpt lat="-35.009389185464926" lon="138.7567085160808">
+    <name>Right turn</name>
+    <desc></desc>
+  </wpt>
+  <wpt lat="-35.00941486903191" lon="138.7579689814464">
+    <name>Sorry</name>
+    <desc></desc>
+  </wpt>
+  <wpt lat="-35.00871095100678" lon="138.75959734241752">
+    <name>Bye-bye</name>
+    <desc></desc>
+  </wpt>
+  <wpt lat="-35.00282403393134" lon="138.76016725418805">
+    <name>Turn off</name>
+    <desc></desc>
+  </wpt>
+
+  <!-- Track -->
+  <trk>
+    <name>Mount barker - Track</name>
+    <trkseg>
+      <trkpt lat="-35.02575247277238" lon="138.75399503937604" />
+      <trkpt lat="-35.02481749288131" lon="138.7546427790031" />
+      <trkpt lat="-35.023642798030615" lon="138.754846299462" />
+      <trkpt lat="-35.02129433576898" lon="138.75399217130266" />
+      <trkpt lat="-35.019969446574024" lon="138.75134391831887" />
+      <trkpt lat="-35.01848526454813" lon="138.75062507671555" />
+      <trkpt lat="-35.016424217879816" lon="138.75199102964166" />
+      <trkpt lat="-35.01369089805042" lon="138.75279001131545" />
+      <trkpt lat="-35.01177933699994" lon="138.75489122615437" />
+      <trkpt lat="-35.01025933313756" lon="138.75556231924747" />
+      <trkpt lat="-35.009479166983404" lon="138.75670581307926" />
+      <trkpt lat="-35.00925492231697" lon="138.75729215073548" />
+      <trkpt lat="-35.00928109754492" lon="138.75914352925273" />
+      <trkpt lat="-35.007267233661814" lon="138.76005095076536" />
+      <trkpt lat="-35.00405588066834" lon="138.75994962595587" />
+      <trkpt lat="-35.002383899750605" lon="138.76070517257816" />
+      <trkpt lat="-35.00344962092355" lon="138.76483658566275" />
+      <trkpt lat="-35.005287997909385" lon="138.77048629319373" />
+      <trkpt lat="-35.006727229695976" lon="138.77666619988105" />
+      <trkpt lat="-35.00977268139783" lon="138.78179847276283" />
+      <trkpt lat="-35.014799479181576" lon="138.78355844261287" />
+      <trkpt lat="-35.019990543352584" lon="138.78431205525865" />
+      <trkpt lat="-35.024248761440894" lon="138.78742102848608" />
+    </trkseg>
+  </trk>
+</gpx>

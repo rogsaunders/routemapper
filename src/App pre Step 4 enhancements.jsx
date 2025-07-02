@@ -53,105 +53,50 @@ function calculateCumulativeDistance(waypoints, currentLat, currentLon) {
 
 function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
   const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="RallyMapper-Voice-v2.0" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+<gpx version="1.1" creator="RallyMapper" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
   <metadata>
     <name>${name}</name>
-    <desc>Rally route created with RallyMapper Voice Navigation - ${
-      waypoints.length
-    } waypoints</desc>
-    <author>
-      <name>RallyMapper Voice</name>
-    </author>
+    <desc>Rally route created with RallyMapper</desc>
     <time>${new Date().toISOString()}</time>
-    <keywords>rally,navigation,voice,waypoints</keywords>
   </metadata>`;
 
-  // Enhanced waypoints with Rally Navigator compatibility
+  // Create waypoints as individual waypoints AND as a route
   const waypointEntries = waypoints
-    .map((wp, index) => {
-      const iconInfo = mapCategoryToStandardIcon(wp.category, wp.name);
-      const isVoiceCreated = wp.voiceCreated ? " (Voice)" : "";
-
-      return `
+    .map(
+      (wp, index) => `
   <wpt lat="${wp.lat}" lon="${wp.lon}">
-    <name>WP${(index + 1).toString().padStart(3, "0")}: ${
-        wp.name
-      }${isVoiceCreated}</name>
-    <desc>${wp.name} - Distance: ${wp.distance}km - Category: ${wp.category}${
-        wp.speedContext ? " - Speed: " + wp.speedContext : ""
-      }${
-        wp.rawTranscript ? ' - Original: "' + wp.rawTranscript + '"' : ""
-      }</desc>
+    <name>WP${index + 1}: ${wp.name}</name>
     <time>${new Date(wp.timestamp).toISOString()}</time>
-    <type>${iconInfo.gpxType}</type>
-    <extensions>
-      <category>${wp.category}</category>
-      <priority>${iconInfo.priority}</priority>
-      <voice_created>${wp.voiceCreated || false}</voice_created>
-      <rally_icon>${iconInfo.icon}</rally_icon>
-      ${
-        wp.speedContext
-          ? `<speed_context>${wp.speedContext}</speed_context>`
-          : ""
-      }
-      ${
-        wp.rawTranscript
-          ? `<original_transcript>${wp.rawTranscript}</original_transcript>`
-          : ""
-      }
-    </extensions>
-  </wpt>`;
-    })
+    <type>waypoint</type>
+  </wpt>`
+    )
     .join("");
 
-  // Enhanced route section with navigation instructions
+  // Create a route that connects all waypoints
   const routeSection =
     waypoints.length > 1
       ? `
   <rte>
-    <name>${name} - Navigation Route</name>
-    <desc>Rally navigation route with ${
-      waypoints.length
-    } waypoints - Total distance: ${
-          waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0
-        }km</desc>
-    <extensions>
-      <total_waypoints>${waypoints.length}</total_waypoints>
-      <voice_waypoints>${
-        waypoints.filter((wp) => wp.voiceCreated).length
-      }</voice_waypoints>
-      <creation_date>${new Date().toISOString()}</creation_date>
-    </extensions>
+    <name>${name} - Route</name>
+    <desc>Rally route with ${waypoints.length} waypoints</desc>
     ${waypoints
-      .map((wp, index) => {
-        const iconInfo = mapCategoryToStandardIcon(wp.category, wp.name);
-        return `
+      .map(
+        (wp, index) => `
     <rtept lat="${wp.lat}" lon="${wp.lon}">
-      <name>WP${(index + 1).toString().padStart(3, "0")}: ${wp.name}</name>
-      <desc>${wp.name} - ${wp.distance}km</desc>
-      <type>${iconInfo.gpxType}</type>
-      <extensions>
-        <rally_instruction>${wp.name}</rally_instruction>
-        <distance_from_start>${wp.distance}</distance_from_start>
-        <waypoint_category>${wp.category}</waypoint_category>
-      </extensions>
-    </rtept>`;
-      })
+      <name>WP${index + 1}: ${wp.name}</name>
+      <desc>Distance: ${wp.distance}km${wp.poi ? " - " + wp.poi : ""}</desc>
+    </rtept>`
+      )
       .join("")}
   </rte>`
       : "";
 
-  // Enhanced tracking with metadata
   const trackingSegment =
     trackingPoints.length > 0
       ? `
   <trk>
-    <name>${name} - GPS Track</name>
-    <desc>Auto-recorded GPS breadcrumbs - ${trackingPoints.length} points</desc>
-    <extensions>
-      <track_points>${trackingPoints.length}</track_points>
-      <recording_interval>20_seconds</recording_interval>
-    </extensions>
+    <name>${name} - Track</name>
+    <desc>Auto-recorded GPS track</desc>
     <trkseg>
       ${trackingPoints
         .map(
@@ -176,152 +121,31 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
 // KML export function
 function buildKML(waypoints = [], trackingPoints = [], name = "Route") {
   const kmlHeader = `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+<kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>${name} - Rally Route</name>
-    <description>Rally route created with RallyMapper Voice Navigation
-    
-Waypoints: ${waypoints.length}
-Voice Created: ${waypoints.filter((wp) => wp.voiceCreated).length}
-Total Distance: ${
-    waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0
-  }km
-Created: ${new Date().toLocaleString()}
-    </description>
-    
-    <!-- Rally-specific styles -->
-    <Style id="voice-waypoint">
-      <IconStyle>
-        <color>ff00ff00</color>
-        <scale>1.2</scale>
-        <Icon>
-          <href>http://maps.google.com/mapfiles/kml/shapes/microphone.png</href>
-        </Icon>
-      </IconStyle>
-      <LabelStyle>
-        <color>ff00ff00</color>
-        <scale>1.1</scale>
-      </LabelStyle>
-    </Style>
-    
-    <Style id="manual-waypoint">
-      <IconStyle>
-        <color>ff0000ff</color>
-        <scale>1.0</scale>
-        <Icon>
-          <href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href>
-        </Icon>
-      </IconStyle>
-    </Style>
-    
-    <Style id="safety-waypoint">
-      <IconStyle>
-        <color>ff0000ff</color>
-        <scale>1.3</scale>
-        <Icon>
-          <href>http://maps.google.com/mapfiles/kml/shapes/caution.png</href>
-        </Icon>
-      </IconStyle>
-    </Style>
-    
-    <Style id="route-line">
-      <LineStyle>
-        <color>ff0000ff</color>
-        <width>4</width>
-      </LineStyle>
-    </Style>
-    
-    <Style id="track-line">
-      <LineStyle>
-        <color>7f00ff00</color>
-        <width>2</width>
-      </LineStyle>
-    </Style>
+    <name>${name}</name>
+    <description>Rally route created with RallyMapper</description>
 `;
 
-  // Enhanced waypoint placemarks with categories
   const waypointPlacemarks = waypoints
-    .map((wp, index) => {
-      const styleId =
-        wp.category === "safety"
-          ? "safety-waypoint"
-          : wp.voiceCreated
-          ? "voice-waypoint"
-          : "manual-waypoint";
-
-      return `
+    .map(
+      (wp) => `
     <Placemark>
-      <name>WP${(index + 1).toString().padStart(3, "0")}: ${wp.name}</name>
-      <description><![CDATA[
-        <h3>${wp.name}</h3>
-        <p><strong>Category:</strong> ${wp.category}</p>
-        <p><strong>Distance from start:</strong> ${wp.distance}km</p>
-        <p><strong>Time recorded:</strong> ${wp.timestamp}</p>
-        <p><strong>Creation method:</strong> ${
-          wp.voiceCreated ? "Voice Input" : "Manual Entry"
-        }</p>
-        <p><strong>GPS:</strong> ${wp.lat.toFixed(6)}, ${wp.lon.toFixed(6)}</p>
-        ${
-          wp.rawTranscript
-            ? `<p><strong>Original voice:</strong> "${wp.rawTranscript}"</p>`
-            : ""
-        }
-        ${
-          wp.speedContext
-            ? `<p><strong>Speed context:</strong> ${wp.speedContext}</p>`
-            : ""
-        }
-      ]]></description>
-      <styleUrl>#${styleId}</styleUrl>
+      <name>${wp.name}</name>
+      <description>${wp.poi || ""}</description>
       <Point>
         <coordinates>${wp.lon},${wp.lat},0</coordinates>
       </Point>
-      <ExtendedData>
-        <Data name="category">
-          <value>${wp.category}</value>
-        </Data>
-        <Data name="voice_created">
-          <value>${wp.voiceCreated || false}</value>
-        </Data>
-        <Data name="distance_km">
-          <value>${wp.distance}</value>
-        </Data>
-      </ExtendedData>
-    </Placemark>`;
-    })
+    </Placemark>`
+    )
     .join("");
 
-  // Route path
-  const routePath =
-    waypoints.length > 1
-      ? `
-    <Placemark>
-      <name>${name} - Route Path</name>
-      <description>Rally route connecting ${
-        waypoints.length
-      } waypoints</description>
-      <styleUrl>#route-line</styleUrl>
-      <LineString>
-        <tessellate>1</tessellate>
-        <coordinates>
-          ${waypoints.map((wp) => `${wp.lon},${wp.lat},0`).join("\n          ")}
-        </coordinates>
-      </LineString>
-    </Placemark>`
-      : "";
-
-  // GPS tracking path
   const trackingPath =
     trackingPoints.length > 0
       ? `
     <Placemark>
-      <name>${name} - GPS Track</name>
-      <description>Auto-recorded GPS breadcrumbs (${
-        trackingPoints.length
-      } points)</description>
-      <styleUrl>#track-line</styleUrl>
+      <name>${name} - Track</name>
       <LineString>
-        <tessellate>1</tessellate>
         <coordinates>
           ${trackingPoints
             .map((pt) => `${pt.lon},${pt.lat},0`)
@@ -335,9 +159,8 @@ Created: ${new Date().toLocaleString()}
   </Document>
 </kml>`;
 
-  return kmlHeader + waypointPlacemarks + routePath + trackingPath + kmlFooter;
+  return kmlHeader + waypointPlacemarks + trackingPath + kmlFooter;
 }
-
 const libraries = []; // declared outside the component or at top level
 export default function App() {
   const { isLoaded } = useJsApiLoader({
@@ -1093,171 +916,23 @@ export default function App() {
     setUndoTimeLeft(5);
   };
 
-  const mapCategoryToStandardIcon = (category, description) => {
-    const text = description.toLowerCase();
-
-    // Map categories and keywords to standard rally icons
-    const iconMapping = {
-      safety: {
-        icon: "danger",
-        gpxType: "danger",
-        priority:
-          text.includes("severe") || text.includes("extreme")
-            ? "high"
-            : "medium",
-      },
-      navigation: {
-        icon: text.includes("left")
-          ? "left"
-          : text.includes("right")
-          ? "right"
-          : text.includes("straight")
-          ? "straight"
-          : "navigation",
-        gpxType: "turn",
-        priority: "high",
-      },
-      surface: {
-        icon: text.includes("bump")
-          ? "bump"
-          : text.includes("hole")
-          ? "hole"
-          : text.includes("rough")
-          ? "bumpy"
-          : "surface",
-        gpxType: "hazard",
-        priority: "medium",
-      },
-      obstacle: {
-        icon:
-          text.includes("grid") || text.includes("cattle")
-            ? "grid"
-            : text.includes("gate")
-            ? "fence-gate"
-            : "obstacle",
-        gpxType: "waypoint",
-        priority: "medium",
-      },
-      elevation: {
-        icon:
-          text.includes("summit") || text.includes("peak")
-            ? "summit"
-            : text.includes("hill")
-            ? "uphill"
-            : "elevation",
-        gpxType: "summit",
-        priority: "low",
-      },
-      crossing: {
-        icon: text.includes("bridge")
-          ? "bridge"
-          : text.includes("water") || text.includes("ford")
-          ? "wading"
-          : "crossing",
-        gpxType: "water",
-        priority: "high",
-      },
-      landmark: {
-        icon: "landmark",
-        gpxType: "building",
-        priority: "low",
-      },
-      timing: {
-        icon: "control",
-        gpxType: "checkpoint",
-        priority: "high",
-      },
-    };
-
-    return (
-      iconMapping[category] || {
-        icon: "waypoint",
-        gpxType: "waypoint",
-        priority: "medium",
-      }
-    );
-  };
-
   const exportAsJSON = async (
     waypointsData = waypoints,
     trackingData = trackingPoints,
     name = "section"
   ) => {
-    // Calculate statistics
-    const voiceWaypoints = waypointsData.filter((wp) => wp.voiceCreated).length;
-    const categories = waypointsData.reduce((acc, wp) => {
-      acc[wp.category] = (acc[wp.category] || 0) + 1;
-      return acc;
-    }, {});
-
     const data = {
-      // Metadata
-      metadata: {
-        routeName: routeName || name,
-        exportDate: new Date().toISOString(),
-        appVersion: "RallyMapper-Voice-v2.0",
-        totalWaypoints: waypointsData.length,
-        voiceWaypoints: voiceWaypoints,
-        manualWaypoints: waypointsData.length - voiceWaypoints,
-        totalDistance:
-          waypointsData.length > 0
-            ? waypointsData[waypointsData.length - 1].distance
-            : 0,
-        categories: categories,
-        hasTracking: trackingData.length > 0,
-        trackingPoints: trackingData.length,
-      },
-
-      // Enhanced waypoints with all voice data
-      waypoints: waypointsData.map((wp, index) => ({
-        id: index + 1,
-        name: wp.name,
-        coordinates: {
-          lat: wp.lat,
-          lon: wp.lon,
-          accuracy: gpsAccuracy, // Current GPS accuracy
-        },
-        timing: {
-          timestamp: wp.timestamp,
-          distanceFromStart: wp.distance,
-        },
-        classification: {
-          category: wp.category,
-          priority: mapCategoryToStandardIcon(wp.category, wp.name).priority,
-          rallyIcon: mapCategoryToStandardIcon(wp.category, wp.name).icon,
-        },
-        creation: {
-          method: wp.voiceCreated ? "voice" : "manual",
-          rawTranscript: wp.rawTranscript || null,
-          processedText: wp.processedText || wp.name,
-          speedContext: wp.speedContext || null,
-        },
-        notes: wp.poi || null,
-      })),
-
-      // Enhanced tracking data
-      tracking: {
-        enabled: trackingData.length > 0,
-        points: trackingData,
-        interval: "20_seconds",
-        totalPoints: trackingData.length,
-      },
-
-      // Export compatibility info
-      compatibility: {
-        rallyNavigator: true,
-        googleEarth: true,
-        garminDevices: true,
-        hema: true,
-        standardGPX: true,
-      },
+      routeName: routeName || name,
+      date: new Date().toISOString(),
+      waypoints: waypointsData,
+      tracking: trackingData,
     };
 
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
 
-    const file = new File([blob], `${name}-enhanced.json`, {
+    const file = new File([blob], `${name}.json`, {
       type: "application/json",
     });
 
@@ -1265,9 +940,10 @@ export default function App() {
       try {
         await navigator.share({
           files: [file],
-          title: "Rally Mapper Enhanced Export",
+          title: "Rally Mapper Export",
+          // text: "Section data (waypoints + tracking)",
         });
-        console.log("✅ Enhanced JSON shared via iOS");
+        console.log("✅ Shared via iOS share sheet");
         return;
       } catch (err) {
         console.warn("Share failed or cancelled", err);
@@ -1277,10 +953,10 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${name}-enhanced.json`;
+    a.download = `${name}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    console.log("⬇️ Enhanced JSON download triggered");
+    console.log("⬇️ Download triggered (fallback)");
   };
 
   const exportAsGPX = async (
@@ -2587,5 +2263,4 @@ export default function App() {
       </div>
     </div>
   );
-  N;
 }

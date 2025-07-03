@@ -662,7 +662,7 @@ export default function App() {
 
       // Show error briefly
       setGpsError(errorMessage);
-      setTimeout(() => setGpsError(null), 3000);
+      setTimeout(() => setGpsError(null), 1000);
     };
 
     recognition.start();
@@ -720,7 +720,7 @@ export default function App() {
       }
 
       setGpsError(errorMessage);
-      setTimeout(() => setGpsError(null), 3000);
+      setTimeout(() => setGpsError(null), 1000);
     };
 
     recognition.start();
@@ -752,7 +752,7 @@ export default function App() {
         setShowEndSectionConfirm(true);
       } else {
         setGpsError("No active section to end.");
-        setTimeout(() => setGpsError(null), 3000);
+        setTimeout(() => setGpsError(null), 1000);
       }
       return;
     }
@@ -762,7 +762,7 @@ export default function App() {
       processVoiceCommand(transcript);
     } else {
       setGpsError("Start a section first to add waypoints.");
-      setTimeout(() => setGpsError(null), 3000);
+      setTimeout(() => setGpsError(null), 1000);
     }
   };
 

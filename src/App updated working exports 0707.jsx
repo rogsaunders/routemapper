@@ -273,60 +273,45 @@ function buildKML(waypoints = [], trackingPoints = [], name = "Route") {
   <Document>
     <name>${name}</name>
     <description>Rally route - ${waypoints.length} waypoints</description>
-    
-    <!-- Waypoint Folder -->
-    <Folder>
-      <name>Waypoints</name>
-      <description>Rally waypoints</description>`;
+`;
 
-  // Individual waypoint placemarks
+  // Simple waypoint placemarks for Rally Navigator compatibility
   const waypointPlacemarks = waypoints
     .map(
       (wp, index) => `
-      <Placemark>
-        <name>WP${(index + 1).toString().padStart(2, "0")} ${wp.name}</name>
-        <description>${wp.name} - ${wp.distance}km${
+    <Placemark>
+      <name>${wp.name}</name>
+      <description>Distance: ${wp.distance}km${
         wp.voiceCreated ? " (Voice)" : ""
       }</description>
-        <Point>
-          <coordinates>${wp.lon},${wp.lat},0</coordinates>
-        </Point>
-      </Placemark>`
+      <Point>
+        <coordinates>${wp.lon},${wp.lat},0</coordinates>
+      </Point>
+    </Placemark>`
     )
     .join("");
 
-  const waypointFolderClose = `
-    </Folder>`;
-
-  // Tracking folder
-  const trackingFolder =
+  // Tracking path
+  const trackingPath =
     trackingPoints.length > 0
       ? `
-    <Folder>
-      <name>GPS Track</name>
-      <description>Auto-recorded GPS track</description>
-      <Placemark>
-        <name>${name} Track</name>
-        <description>GPS breadcrumbs - ${
-          trackingPoints.length
-        } points</description>
-        <LineString>
-          <tessellate>1</tessellate>
-          <coordinates>
-            ${trackingPoints
-              .map((pt) => `${pt.lon},${pt.lat},0`)
-              .join("\n            ")}
-          </coordinates>
-        </LineString>
-      </Placemark>
-    </Folder>`
+    <Placemark>
+      <name>${name} - Track</name>
+      <LineString>
+        <tessellate>1</tessellate>
+        <coordinates>
+          ${trackingPoints
+            .map((pt) => `${pt.lon},${pt.lat},0`)
+            .join("\n          ")}
+        </coordinates>
+      </LineString>
+    </Placemark>`
       : "";
 
   return (
     kmlHeader +
     waypointPlacemarks +
-    waypointFolderClose +
-    trackingFolder +
+    trackingPath +
     `
   </Document>
 </kml>`
@@ -1147,15 +1132,13 @@ export default function App() {
     }
   };
 
-  // UPDATED EXPORT FUNCTIONS FOR PWA COMPATIBILITY
-
   const exportAsJSON = async (
     waypointsData = waypoints,
     trackingData = trackingPoints,
     name = "section"
   ) => {
     try {
-      // Your existing data structure
+      // Calculate statistics
       const voiceWaypoints = waypointsData.filter(
         (wp) => wp.voiceCreated
       ).length;
@@ -1165,6 +1148,7 @@ export default function App() {
       }, {});
 
       const data = {
+        // Metadata
         metadata: {
           routeName: routeName || name,
           exportDate: new Date().toISOString(),
@@ -1180,11 +1164,20 @@ export default function App() {
           hasTracking: trackingData.length > 0,
           trackingPoints: trackingData.length,
         },
+
+        // Enhanced waypoints with all voice data
         waypoints: waypointsData.map((wp, index) => ({
           id: index + 1,
           name: wp.name,
-          coordinates: { lat: wp.lat, lon: wp.lon, accuracy: gpsAccuracy },
-          timing: { timestamp: wp.timestamp, distanceFromStart: wp.distance },
+          coordinates: {
+            lat: wp.lat,
+            lon: wp.lon,
+            accuracy: gpsAccuracy, // Current GPS accuracy
+          },
+          timing: {
+            timestamp: wp.timestamp,
+            distanceFromStart: wp.distance,
+          },
           classification: {
             category: wp.category,
             priority: mapCategoryToStandardIcon(wp.category, wp.name).priority,
@@ -1198,12 +1191,16 @@ export default function App() {
           },
           notes: wp.poi || null,
         })),
+
+        // Enhanced tracking data
         tracking: {
           enabled: trackingData.length > 0,
           points: trackingData,
           interval: "20_seconds",
           totalPoints: trackingData.length,
         },
+
+        // Export compatibility info
         compatibility: {
           rallyNavigator: true,
           googleEarth: true,
@@ -1217,108 +1214,16 @@ export default function App() {
         type: "application/json",
       });
 
-      // Try iOS Share Sheet first (works better in PWA)
-      if (navigator.canShare) {
-        const file = new File([blob], `${name}-enhanced.json`, {
-          type: "application/json",
-        });
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: "Rally Mapper Enhanced JSON",
-              text: `Rally route: ${name}`,
-            });
-            console.log("✅ Enhanced JSON shared via iOS");
-            return;
-          } catch (err) {
-            console.log("Share failed:", err.message);
-          }
-        }
-      }
-
-      // Fallback to download
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `${name}-enhanced.json`;
-      document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
       console.log("✅ Enhanced JSON downloaded");
     } catch (error) {
       console.error("❌ JSON export failed:", error);
-    }
-  };
-
-  const exportAsSimpleJSON = async (
-    waypointsData = waypoints,
-    trackingData = trackingPoints,
-    name = "section"
-  ) => {
-    try {
-      const data = {
-        name: routeName || name,
-        date: new Date().toISOString(),
-        waypoints: waypointsData.map((wp, index) => ({
-          name: wp.name,
-          lat: wp.lat,
-          lon: wp.lon,
-          distance: wp.distance,
-          timestamp: wp.timestamp,
-          description: wp.name + (wp.voiceCreated ? " (Voice)" : ""),
-        })),
-        track:
-          trackingData.length > 0
-            ? {
-                name: `${name} Track`,
-                points: trackingData.map((pt) => ({
-                  lat: pt.lat,
-                  lon: pt.lon,
-                  timestamp: pt.timestamp,
-                })),
-              }
-            : null,
-      };
-
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: "application/json",
-      });
-
-      // Try iOS Share Sheet
-      if (navigator.canShare) {
-        const file = new File([blob], `${name}-simple.json`, {
-          type: "application/json",
-        });
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: "Rally Mapper Simple JSON",
-            });
-            console.log("✅ Simple JSON shared via iOS");
-            return;
-          } catch (err) {
-            console.log("Share failed:", err.message);
-          }
-        }
-      }
-
-      // Fallback download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${name}-simple.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      console.log("✅ Simple JSON downloaded");
-    } catch (error) {
-      console.error("❌ Simple JSON export error:", error);
     }
   };
 
@@ -1333,48 +1238,36 @@ export default function App() {
       const gpxContent = buildGPX(waypointsData, trackingData, name);
       console.log("🔍 GPX content length:", gpxContent.length);
 
+      // Use blob URL method (most compatible with iOS)
       const blob = new Blob([gpxContent], { type: "application/gpx+xml" });
-
-      // Try iOS Share Sheet
-      if (navigator.canShare) {
-        const file = new File([blob], `${name}.gpx`, {
-          type: "application/gpx+xml",
-        });
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: "Rally Mapper GPX Export",
-            });
-            console.log("✅ GPX shared via iOS");
-            return;
-          } catch (err) {
-            console.log("GPX share failed:", err.message);
-          }
-        }
-      }
-
-      // Fallback download
       const url = window.URL.createObjectURL(blob);
+
       const a = document.createElement("a");
       a.href = url;
       a.download = `${name}.gpx`;
+      a.style.display = "none";
+
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+
+      // Clean up
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 1000);
 
       console.log("✅ GPX download completed");
 
-      // User feedback
-      setGpsError("✅ GPX exported! Check share options or Downloads");
+      // Show success message to user
+      setGpsError("✅ GPX file downloaded! Check Files app → Downloads");
       setTimeout(() => setGpsError(null), 4000);
     } catch (error) {
       console.error("❌ GPX export error:", error);
+      setGpsError("GPX export failed. Check console for details.");
+      setTimeout(() => setGpsError(null), 4000);
     }
   };
 
-  // KML export is already working, but here's the updated version for consistency
   const exportAsKML = async (
     waypointsData = waypoints,
     trackingData = trackingPoints,
@@ -1385,35 +1278,20 @@ export default function App() {
       const blob = new Blob([kmlContent], {
         type: "application/vnd.google-earth.kml+xml",
       });
-
-      // Try iOS Share Sheet
-      if (navigator.canShare) {
-        const file = new File([blob], `${name}.kml`, {
-          type: "application/vnd.google-earth.kml+xml",
-        });
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: "Rally Mapper KML Export",
-            });
-            console.log("✅ KML shared via iOS");
-            return;
-          } catch (err) {
-            console.log("KML share failed:", err.message);
-          }
-        }
-      }
-
-      // Fallback download
       const url = window.URL.createObjectURL(blob);
+
       const a = document.createElement("a");
       a.href = url;
       a.download = `${name}.kml`;
+      a.style.display = "none";
+
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 1000);
 
       console.log("✅ KML download completed");
     } catch (error) {

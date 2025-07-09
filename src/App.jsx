@@ -125,6 +125,7 @@ function mapCategoryToStandardIcon(category, description) {
     },
   };
 
+  // Ensure this return statement is inside a valid function or component
   return (
     iconMapping[category] || {
       icon: "waypoint",
@@ -411,39 +412,64 @@ export default function App() {
       setGpsAccuracy(accuracy);
       setGpsLoading(false);
       setGpsError(null);
-      console.log("📍 GPS Updated:", gps, "Accuracy:", accuracy + "m");
+      console.log(
+        "📍 GPS Updated:",
+        gps.lat.toFixed(6),
+        gps.lon.toFixed(6),
+        "Accuracy:",
+        Math.round(accuracy) + "m"
+      );
     };
 
     const handleError = (err) => {
       console.error("❌ GPS error", err);
       setGpsLoading(false);
 
-      // User-friendly error messages
+      // More detailed error messages
       switch (err.code) {
         case err.PERMISSION_DENIED:
-          setGpsError("GPS access denied. Please enable location permissions.");
+          setGpsError(
+            "GPS access denied. Please enable location permissions in your browser settings."
+          );
           break;
         case err.POSITION_UNAVAILABLE:
-          setGpsError("GPS signal unavailable. Try moving to an open area.");
+          setGpsError(
+            "GPS signal unavailable. Try moving to an open area or reloading the page."
+          );
           break;
         case err.TIMEOUT:
-          setGpsError("GPS timeout. Retrying...");
+          setGpsError("GPS timeout. Trying again...");
+          // Retry after timeout
+          setTimeout(() => {
+            setGpsLoading(true);
+            setGpsError(null);
+          }, 2000);
           break;
         default:
-          setGpsError("GPS error occurred. Check your location settings.");
+          setGpsError(
+            `GPS error (${err.code}): ${err.message}. Check your location settings.`
+          );
       }
     };
 
-    const watchId = geo.watchPosition(handleSuccess, handleError, {
+    const options = {
       enableHighAccuracy: true,
       timeout: 15000,
       maximumAge: 10000,
-    });
+    };
 
-    return () => geo.clearWatch(watchId);
+    // Get initial position
+    geo.getCurrentPosition(handleSuccess, handleError, options);
+
+    // Start watching position
+    const watchId = geo.watchPosition(handleSuccess, handleError, options);
+
+    return () => {
+      if (watchId) {
+        geo.clearWatch(watchId);
+      }
+    };
   }, []);
-
-  console.log("📍 GPS updated:", currentGPS?.lat, currentGPS?.lon);
 
   useEffect(() => {
     setTodayDate(new Date().toISOString().split("T")[0]);
@@ -676,7 +702,6 @@ export default function App() {
     recognition.start();
   };
 
-  // ADD THE NEW FUNCTIONS HERE:
   const handleGlobalVoiceCommands = () => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1099,328 +1124,6 @@ export default function App() {
     setUndoTimeLeft(5);
   };
 
-  const exportAsSimpleJSON = async (
-    waypointsData = waypoints,
-    trackingData = trackingPoints,
-    name = "section"
-  ) => {
-    try {
-      // Simple JSON structure compatible with converters
-      const data = {
-        name: routeName || name,
-        date: new Date().toISOString(),
-        waypoints: waypointsData.map((wp, index) => ({
-          name: wp.name,
-          lat: wp.lat,
-          lon: wp.lon,
-          distance: wp.distance,
-          timestamp: wp.timestamp,
-          description: wp.name + (wp.voiceCreated ? " (Voice)" : ""),
-        })),
-        track:
-          trackingData.length > 0
-            ? {
-                name: `${name} Track`,
-                points: trackingData.map((pt) => ({
-                  lat: pt.lat,
-                  lon: pt.lon,
-                  timestamp: pt.timestamp,
-                })),
-              }
-            : null,
-      };
-
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${name}-simple.json`;
-      a.click();
-
-      URL.revokeObjectURL(url);
-      console.log("✅ Simple JSON downloaded");
-    } catch (error) {
-      console.error("❌ Simple JSON export error:", error);
-    }
-  };
-
-  // UPDATED EXPORT FUNCTIONS FOR PWA COMPATIBILITY
-
-  const exportAsJSON = async (
-    waypointsData = waypoints,
-    trackingData = trackingPoints,
-    name = "section"
-  ) => {
-    try {
-      // Your existing data structure
-      const voiceWaypoints = waypointsData.filter(
-        (wp) => wp.voiceCreated
-      ).length;
-      const categories = waypointsData.reduce((acc, wp) => {
-        acc[wp.category] = (acc[wp.category] || 0) + 1;
-        return acc;
-      }, {});
-
-      const data = {
-        metadata: {
-          routeName: routeName || name,
-          exportDate: new Date().toISOString(),
-          appVersion: "RallyMapper-Voice-v2.0",
-          totalWaypoints: waypointsData.length,
-          voiceWaypoints: voiceWaypoints,
-          manualWaypoints: waypointsData.length - voiceWaypoints,
-          totalDistance:
-            waypointsData.length > 0
-              ? waypointsData[waypointsData.length - 1].distance
-              : 0,
-          categories: categories,
-          hasTracking: trackingData.length > 0,
-          trackingPoints: trackingData.length,
-        },
-        waypoints: waypointsData.map((wp, index) => ({
-          id: index + 1,
-          name: wp.name,
-          coordinates: { lat: wp.lat, lon: wp.lon, accuracy: gpsAccuracy },
-          timing: { timestamp: wp.timestamp, distanceFromStart: wp.distance },
-          classification: {
-            category: wp.category,
-            priority: mapCategoryToStandardIcon(wp.category, wp.name).priority,
-            rallyIcon: mapCategoryToStandardIcon(wp.category, wp.name).icon,
-          },
-          creation: {
-            method: wp.voiceCreated ? "voice" : "manual",
-            rawTranscript: wp.rawTranscript || null,
-            processedText: wp.processedText || wp.name,
-            speedContext: wp.speedContext || null,
-          },
-          notes: wp.poi || null,
-        })),
-        tracking: {
-          enabled: trackingData.length > 0,
-          points: trackingData,
-          interval: "20_seconds",
-          totalPoints: trackingData.length,
-        },
-        compatibility: {
-          rallyNavigator: true,
-          googleEarth: true,
-          garminDevices: true,
-          hema: true,
-          standardGPX: true,
-        },
-      };
-
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: "application/json",
-      });
-
-      // Try iOS Share Sheet first (works better in PWA)
-      if (navigator.canShare) {
-        const file = new File([blob], `${name}-enhanced.json`, {
-          type: "application/json",
-        });
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: "Rally Mapper Enhanced JSON",
-              text: `Rally route: ${name}`,
-            });
-            console.log("✅ Enhanced JSON shared via iOS");
-            return;
-          } catch (err) {
-            console.log("Share failed:", err.message);
-          }
-        }
-      }
-
-      // Fallback to download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${name}-enhanced.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      console.log("✅ Enhanced JSON downloaded");
-    } catch (error) {
-      console.error("❌ JSON export failed:", error);
-    }
-  };
-
-  const exportAsSimpleJSON = async (
-    waypointsData = waypoints,
-    trackingData = trackingPoints,
-    name = "section"
-  ) => {
-    try {
-      const data = {
-        name: routeName || name,
-        date: new Date().toISOString(),
-        waypoints: waypointsData.map((wp, index) => ({
-          name: wp.name,
-          lat: wp.lat,
-          lon: wp.lon,
-          distance: wp.distance,
-          timestamp: wp.timestamp,
-          description: wp.name + (wp.voiceCreated ? " (Voice)" : ""),
-        })),
-        track:
-          trackingData.length > 0
-            ? {
-                name: `${name} Track`,
-                points: trackingData.map((pt) => ({
-                  lat: pt.lat,
-                  lon: pt.lon,
-                  timestamp: pt.timestamp,
-                })),
-              }
-            : null,
-      };
-
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: "application/json",
-      });
-
-      // Try iOS Share Sheet
-      if (navigator.canShare) {
-        const file = new File([blob], `${name}-simple.json`, {
-          type: "application/json",
-        });
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: "Rally Mapper Simple JSON",
-            });
-            console.log("✅ Simple JSON shared via iOS");
-            return;
-          } catch (err) {
-            console.log("Share failed:", err.message);
-          }
-        }
-      }
-
-      // Fallback download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${name}-simple.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      console.log("✅ Simple JSON downloaded");
-    } catch (error) {
-      console.error("❌ Simple JSON export error:", error);
-    }
-  };
-
-  const exportAsGPX = async (
-    waypointsData = waypoints,
-    trackingData = trackingPoints,
-    name = "route"
-  ) => {
-    try {
-      console.log("🔍 Starting GPX export...");
-
-      const gpxContent = buildGPX(waypointsData, trackingData, name);
-      console.log("🔍 GPX content length:", gpxContent.length);
-
-      const blob = new Blob([gpxContent], { type: "application/gpx+xml" });
-
-      // Try iOS Share Sheet
-      if (navigator.canShare) {
-        const file = new File([blob], `${name}.gpx`, {
-          type: "application/gpx+xml",
-        });
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: "Rally Mapper GPX Export",
-            });
-            console.log("✅ GPX shared via iOS");
-            return;
-          } catch (err) {
-            console.log("GPX share failed:", err.message);
-          }
-        }
-      }
-
-      // Fallback download
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${name}.gpx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      console.log("✅ GPX download completed");
-
-      // User feedback
-      setGpsError("✅ GPX exported! Check share options or Downloads");
-      setTimeout(() => setGpsError(null), 4000);
-    } catch (error) {
-      console.error("❌ GPX export error:", error);
-    }
-  };
-
-  // KML export is already working, but here's the updated version for consistency
-  const exportAsKML = async (
-    waypointsData = waypoints,
-    trackingData = trackingPoints,
-    name = "route"
-  ) => {
-    try {
-      const kmlContent = buildKML(waypointsData, trackingData, name);
-      const blob = new Blob([kmlContent], {
-        type: "application/vnd.google-earth.kml+xml",
-      });
-
-      // Try iOS Share Sheet
-      if (navigator.canShare) {
-        const file = new File([blob], `${name}.kml`, {
-          type: "application/vnd.google-earth.kml+xml",
-        });
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: "Rally Mapper KML Export",
-            });
-            console.log("✅ KML shared via iOS");
-            return;
-          } catch (err) {
-            console.log("KML share failed:", err.message);
-          }
-        }
-      }
-
-      // Fallback download
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${name}.kml`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      console.log("✅ KML download completed");
-    } catch (error) {
-      console.error("❌ KML export error:", error);
-    }
-  };
-
   const startEditingWaypoint = (index) => {
     setEditingWaypoint(index);
     setEditValues({
@@ -1542,68 +1245,320 @@ export default function App() {
     console.log("↩️ Last waypoint undone");
   };
 
-  const handleEndSection = () => {
-    setSectionStarted(false);
-    setUndoTimeLeft(5);
-
-    const sectionNameFormatted = `${todayDate}/Section ${sectionCount}`;
-    const currentSection = { name: sectionNameFormatted, waypoints };
-
-    const summary = {
-      name: sectionNameFormatted,
-      waypointCount: waypoints.length,
-      startTime: waypoints[0]?.timestamp || "N/A",
-      endTime: waypoints[waypoints.length - 1]?.timestamp || "N/A",
-      totalDistance: waypoints
-        .reduce((sum, wp) => sum + parseFloat(wp.distance || 0), 0)
-        .toFixed(2),
-      pois: [...new Set(waypoints.map((wp) => wp.poi).filter(Boolean))],
-      startCoords: waypoints[0]
-        ? `${waypoints[0].lat.toFixed(5)}, ${waypoints[0].lon.toFixed(5)}`
-        : "N/A",
-      endCoords: waypoints[waypoints.length - 1]
-        ? `${waypoints[waypoints.length - 1].lat.toFixed(5)}, ${waypoints[
-            waypoints.length - 1
-          ].lon.toFixed(5)}`
-        : "N/A",
-      routeName: routeName || "Unnamed Route",
-    };
-
-    setSections((prev) => [...prev, currentSection]);
-    setSectionSummaries((prev) => [...prev, summary]);
-
-    // Export all formats with improved error handling
-    const exportName = routeName || sectionNameFormatted;
-
+  const exportAsJSON = async (
+    waypointsData = waypoints,
+    trackingData = trackingPoints,
+    name = "section"
+  ) => {
     try {
-      exportAsJSON(waypoints, trackingPoints, exportName);
-    } catch (err) {
-      console.error("JSON export failed:", err);
-    }
+      console.log("🔍 Starting JSON export...");
 
+      const voiceWaypoints = waypointsData.filter(
+        (wp) => wp.voiceCreated
+      ).length;
+      const categories = waypointsData.reduce((acc, wp) => {
+        acc[wp.category || "general"] =
+          (acc[wp.category || "general"] || 0) + 1;
+        return acc;
+      }, {});
+
+      const data = {
+        metadata: {
+          routeName: routeName || name,
+          exportDate: new Date().toISOString(),
+          appVersion: "RallyMapper-Voice-v2.0",
+          totalWaypoints: waypointsData.length,
+          voiceWaypoints: voiceWaypoints,
+          manualWaypoints: waypointsData.length - voiceWaypoints,
+          totalDistance:
+            waypointsData.length > 0
+              ? waypointsData[waypointsData.length - 1].distance
+              : 0,
+          categories: categories,
+          hasTracking: trackingData.length > 0,
+          trackingPoints: trackingData.length,
+        },
+        waypoints: waypointsData.map((wp, index) => ({
+          id: index + 1,
+          name: wp.name,
+          coordinates: { lat: wp.lat, lon: wp.lon, accuracy: gpsAccuracy },
+          timing: { timestamp: wp.timestamp, distanceFromStart: wp.distance },
+          classification: {
+            category: wp.category || "general",
+            priority: mapCategoryToStandardIcon(
+              wp.category || "general",
+              wp.name
+            ).priority,
+            rallyIcon: mapCategoryToStandardIcon(
+              wp.category || "general",
+              wp.name
+            ).icon,
+          },
+          creation: {
+            method: wp.voiceCreated ? "voice" : "manual",
+            rawTranscript: wp.rawTranscript || null,
+            processedText: wp.processedText || wp.name,
+            speedContext: wp.speedContext || null,
+          },
+          notes: wp.poi || null,
+        })),
+        tracking: {
+          enabled: trackingData.length > 0,
+          points: trackingData,
+          interval: "20_seconds",
+          totalPoints: trackingData.length,
+        },
+        compatibility: {
+          rallyNavigator: true,
+          googleEarth: true,
+          garminDevices: true,
+          hema: true,
+          standardGPX: true,
+        },
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+
+      const fileName = `${name}-enhanced.json`;
+
+      // Try iOS Share Sheet first (works better in PWA)
+      if (
+        navigator.canShare &&
+        navigator.canShare({
+          files: [new File([blob], fileName, { type: "application/json" })],
+        })
+      ) {
+        try {
+          const file = new File([blob], fileName, { type: "application/json" });
+          await navigator.share({
+            files: [file],
+            title: "Rally Mapper Enhanced JSON",
+            text: `Rally route: ${name}`,
+          });
+          console.log("✅ Enhanced JSON shared via iOS");
+          return true;
+        } catch (err) {
+          console.log("Share failed, falling back to download:", err.message);
+        }
+      }
+
+      // Fallback to download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      console.log("✅ Enhanced JSON downloaded");
+      return true;
+    } catch (error) {
+      console.error("❌ JSON export failed:", error);
+      throw error;
+    }
+  };
+
+  const exportAsSimpleJSON = async (
+    waypointsData = waypoints,
+    trackingData = trackingPoints,
+    name = "section"
+  ) => {
     try {
-      exportAsSimpleJSON(waypoints, trackingPoints, exportName);
-    } catch (err) {
-      console.error("Simple JSON export failed:", err);
-    }
+      console.log("🔍 Starting Simple JSON export...");
 
+      const data = {
+        name: routeName || name,
+        date: new Date().toISOString(),
+        waypoints: waypointsData.map((wp, index) => ({
+          name: wp.name,
+          lat: wp.lat,
+          lon: wp.lon,
+          distance: wp.distance,
+          timestamp: wp.timestamp,
+          description: wp.name + (wp.voiceCreated ? " (Voice)" : ""),
+        })),
+        track:
+          trackingData.length > 0
+            ? {
+                name: `${name} Track`,
+                points: trackingData.map((pt) => ({
+                  lat: pt.lat,
+                  lon: pt.lon,
+                  timestamp: pt.timestamp,
+                })),
+              }
+            : null,
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+
+      const fileName = `${name}-simple.json`;
+
+      // Try iOS Share Sheet
+      if (
+        navigator.canShare &&
+        navigator.canShare({
+          files: [new File([blob], fileName, { type: "application/json" })],
+        })
+      ) {
+        try {
+          const file = new File([blob], fileName, { type: "application/json" });
+          await navigator.share({
+            files: [file],
+            title: "Rally Mapper Simple JSON",
+          });
+          console.log("✅ Simple JSON shared via iOS");
+          return true;
+        } catch (err) {
+          console.log("Share failed, falling back to download:", err.message);
+        }
+      }
+
+      // Fallback download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      console.log("✅ Simple JSON downloaded");
+      return true;
+    } catch (error) {
+      console.error("❌ Simple JSON export error:", error);
+      throw error;
+    }
+  };
+
+  const exportAsGPX = async (
+    waypointsData = waypoints,
+    trackingData = trackingPoints,
+    name = "route"
+  ) => {
     try {
-      exportAsGPX(waypoints, trackingPoints, exportName);
-    } catch (err) {
-      console.error("GPX export failed:", err);
-    }
+      console.log("🔍 Starting GPX export...");
 
+      const gpxContent = buildGPX(waypointsData, trackingData, name);
+      console.log("🔍 GPX content length:", gpxContent.length);
+
+      const blob = new Blob([gpxContent], { type: "application/gpx+xml" });
+      const fileName = `${name}.gpx`;
+
+      // Try iOS Share Sheet
+      if (
+        navigator.canShare &&
+        navigator.canShare({
+          files: [new File([blob], fileName, { type: "application/gpx+xml" })],
+        })
+      ) {
+        try {
+          const file = new File([blob], fileName, {
+            type: "application/gpx+xml",
+          });
+          await navigator.share({
+            files: [file],
+            title: "Rally Mapper GPX Export",
+          });
+          console.log("✅ GPX shared via iOS");
+          return true;
+        } catch (err) {
+          console.log(
+            "GPX share failed, falling back to download:",
+            err.message
+          );
+        }
+      }
+
+      // Fallback download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      console.log("✅ GPX download completed");
+      return true;
+    } catch (error) {
+      console.error("❌ GPX export error:", error);
+      throw error;
+    }
+  };
+
+  const exportAsKML = async (
+    waypointsData = waypoints,
+    trackingData = trackingPoints,
+    name = "route"
+  ) => {
     try {
-      exportAsKML(waypoints, trackingPoints, exportName);
-    } catch (err) {
-      console.error("KML export failed:", err);
+      console.log("🔍 Starting KML export...");
+
+      const kmlContent = buildKML(waypointsData, trackingData, name);
+      const blob = new Blob([kmlContent], {
+        type: "application/vnd.google-earth.kml+xml",
+      });
+
+      const fileName = `${name}.kml`;
+
+      // Try iOS Share Sheet
+      if (
+        navigator.canShare &&
+        navigator.canShare({
+          files: [
+            new File([blob], fileName, {
+              type: "application/vnd.google-earth.kml+xml",
+            }),
+          ],
+        })
+      ) {
+        try {
+          const file = new File([blob], fileName, {
+            type: "application/vnd.google-earth.kml+xml",
+          });
+          await navigator.share({
+            files: [file],
+            title: "Rally Mapper KML Export",
+          });
+          console.log("✅ KML shared via iOS");
+          return true;
+        } catch (err) {
+          console.log(
+            "KML share failed, falling back to download:",
+            err.message
+          );
+        }
+      }
+
+      // Fallback download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      console.log("✅ KML download completed");
+      return true;
+    } catch (error) {
+      console.error("❌ KML export error:", error);
+      throw error;
     }
-
-    setRefreshKey((prev) => prev + 1);
-    setIsTracking(false);
-    localStorage.removeItem("unsavedWaypoints");
-
-    console.log("Section ended and exports completed.");
   };
 
   if (!isLoaded) {
@@ -1675,26 +1630,26 @@ export default function App() {
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           <div className="flex items-center">
             <span className="text-red-500 mr-2">⚠️</span>
-            <div>
+            <div className="flex-1">
               <strong>GPS Error:</strong> {gpsError}
-              <button
-                onClick={() => window.location.reload()}
-                className="ml-2 text-red-600 underline hover:text-red-800"
-              >
-                Retry
-              </button>
             </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="ml-2 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+            >
+              Retry
+            </button>
           </div>
         </div>
       );
     }
 
-    if (!currentGPS) {
+    if (gpsLoading || !currentGPS?.lat || !currentGPS?.lon) {
       return (
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
           <div className="flex items-center">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600 mr-2"></div>
-            <span>Waiting for GPS signal...</span>
+            <span>Acquiring GPS signal... Please wait.</span>
           </div>
         </div>
       );
@@ -1705,9 +1660,12 @@ export default function App() {
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <span className="text-green-500 mr-2">📍</span>
-            <span>GPS Active:</span>
+            <span>GPS Active</span>
           </div>
           <div className="text-sm">
+            <span className="mr-3">
+              {currentGPS.lat.toFixed(6)}, {currentGPS.lon.toFixed(6)}
+            </span>
             Accuracy: ±{gpsAccuracy ? Math.round(gpsAccuracy) : "?"}m
             <span
               className={`ml-2 px-2 py-1 rounded text-xs ${
@@ -1739,6 +1697,176 @@ export default function App() {
         <div className="flex items-center">
           <span className="text-xl mr-2">✅</span>
           <span>Waypoint Added!</span>
+        </div>
+      </div>
+    );
+  };
+
+  const handleEndSection = async () => {
+    try {
+      setSectionStarted(false);
+      setUndoTimeLeft(5);
+
+      const sectionNameFormatted = `${todayDate}/Section ${sectionCount}`;
+      const currentSection = { name: sectionNameFormatted, waypoints };
+
+      const summary = {
+        name: sectionNameFormatted,
+        waypointCount: waypoints.length,
+        startTime: waypoints[0]?.timestamp || "N/A",
+        endTime: waypoints[waypoints.length - 1]?.timestamp || "N/A",
+        totalDistance: waypoints
+          .reduce((sum, wp) => sum + parseFloat(wp.distance || 0), 0)
+          .toFixed(2),
+        pois: [...new Set(waypoints.map((wp) => wp.poi).filter(Boolean))],
+        startCoords: waypoints[0]
+          ? `${waypoints[0].lat.toFixed(5)}, ${waypoints[0].lon.toFixed(5)}`
+          : "N/A",
+        endCoords: waypoints[waypoints.length - 1]
+          ? `${waypoints[waypoints.length - 1].lat.toFixed(5)}, ${waypoints[
+              waypoints.length - 1
+            ].lon.toFixed(5)}`
+          : "N/A",
+        routeName: routeName || "Unnamed Route",
+      };
+
+      setSections((prev) => [...prev, currentSection]);
+      setSectionSummaries((prev) => [...prev, summary]);
+
+      // Show user what's happening
+      setGpsError("📤 Exporting files...");
+
+      const exportName = routeName || sectionNameFormatted;
+
+      // Export all formats with better error handling
+      const exportResults = await Promise.allSettled([
+        exportAsJSON(waypoints, trackingPoints, exportName),
+        exportAsSimpleJSON(waypoints, trackingPoints, exportName),
+        exportAsGPX(waypoints, trackingPoints, exportName),
+        exportAsKML(waypoints, trackingPoints, exportName),
+      ]);
+
+      // Count successful exports
+      const successCount = exportResults.filter(
+        (result) => result.status === "fulfilled"
+      ).length;
+
+      if (successCount === exportResults.length) {
+        setGpsError("✅ All files exported successfully!");
+      } else if (successCount > 0) {
+        setGpsError(
+          `⚠️ ${successCount}/${exportResults.length} files exported successfully`
+        );
+      } else {
+        setGpsError("❌ Export failed. Check console for details.");
+      }
+
+      // Log any failures
+      exportResults.forEach((result, index) => {
+        if (result.status === "rejected") {
+          console.error(`Export ${index} failed:`, result.reason);
+        }
+      });
+
+      setTimeout(() => setGpsError(null), 8000);
+
+      setRefreshKey((prev) => prev + 1);
+      setIsTracking(false);
+      localStorage.removeItem("unsavedWaypoints");
+
+      console.log("Section ended and exports completed.");
+    } catch (error) {
+      console.error("❌ handleEndSection error:", error);
+      setGpsError("❌ Section end failed. Check console.");
+      setTimeout(() => setGpsError(null), 5000);
+    }
+  };
+
+  const StartSectionConfirmDialog = () => {
+    if (!showStartSectionConfirm) return null;
+
+    return (
+      <div
+        style={{
+          position: "fixed",
+          top: "0",
+          left: "0",
+          right: "0",
+          bottom: "0",
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: "999",
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: "white",
+            borderRadius: "8px",
+            padding: "24px",
+            width: "320px",
+            maxWidth: "90vw",
+            boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
+            margin: "20px",
+          }}
+        >
+          <h3
+            style={{
+              fontSize: "1.125rem",
+              fontWeight: "bold",
+              color: "#1F2937",
+              marginBottom: "16px",
+            }}
+          >
+            Start New Section?
+          </h3>
+          <p
+            style={{
+              color: "#6B7280",
+              marginBottom: "24px",
+              lineHeight: "1.5",
+            }}
+          >
+            This will clear your current {waypoints.length} waypoint
+            {waypoints.length !== 1 ? "s" : ""} and start fresh. Make sure
+            you've exported your current data first.
+          </p>
+          <div style={{ display: "flex", gap: "12px" }}>
+            <button
+              onClick={() => setShowStartSectionConfirm(false)}
+              style={{
+                flex: "1",
+                padding: "10px 16px",
+                backgroundColor: "#D1D5DB",
+                color: "#374151",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "500",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowStartSectionConfirm(false);
+                handleStartSection();
+              }}
+              style={{
+                flex: "1",
+                padding: "10px 16px",
+                backgroundColor: "#DC2626",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "500",
+              }}
+            >
+              Start New Section
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1826,97 +1954,6 @@ export default function App() {
               }}
             >
               End Section
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Start Section Confirmation Dialog
-  const StartSectionConfirmDialog = () => {
-    if (!showStartSectionConfirm) return null;
-
-    return (
-      <div
-        style={{
-          position: "fixed",
-          top: "0",
-          left: "0",
-          right: "0",
-          bottom: "0",
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: "999",
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: "white",
-            borderRadius: "8px",
-            padding: "24px",
-            width: "320px",
-            maxWidth: "90vw",
-            boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
-            margin: "20px",
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "1.125rem",
-              fontWeight: "bold",
-              color: "#1F2937",
-              marginBottom: "16px",
-            }}
-          >
-            Start New Section?
-          </h3>
-          <p
-            style={{
-              color: "#6B7280",
-              marginBottom: "24px",
-              lineHeight: "1.5",
-            }}
-          >
-            This will clear your current {waypoints.length} waypoint
-            {waypoints.length !== 1 ? "s" : ""} and start fresh. Make sure
-            you've exported your current data first.
-          </p>
-          <div style={{ display: "flex", gap: "12px" }}>
-            <button
-              onClick={() => setShowStartSectionConfirm(false)}
-              style={{
-                flex: "1",
-                padding: "10px 16px",
-                backgroundColor: "#D1D5DB",
-                color: "#374151",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: "500",
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                setShowStartSectionConfirm(false);
-                handleStartSection();
-              }}
-              style={{
-                flex: "1",
-                padding: "10px 16px",
-                backgroundColor: "#DC2626",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: "500",
-              }}
-            >
-              Start New Section
             </button>
           </div>
         </div>
@@ -2282,6 +2319,173 @@ export default function App() {
             ⏹ End Section
           </button>
         </div>
+      </div>
+
+      <div className="flex gap-2 mt-2 p-2 bg-gray-100 rounded flex-wrap">
+        <button
+          className="bg-purple-600 text-white px-3 py-2 rounded text-sm hover:bg-purple-700"
+          onClick={async () => {
+            console.log("🔍 Share capabilities test:");
+            console.log("- navigator.canShare:", !!navigator.canShare);
+            console.log("- navigator.share:", !!navigator.share);
+            console.log("- PWA mode:", !!window.navigator.standalone);
+            console.log("- User agent:", navigator.userAgent);
+
+            if (navigator.canShare) {
+              const testFile = new File(["test content"], "test.txt", {
+                type: "text/plain",
+              });
+              console.log(
+                "- Can share files:",
+                navigator.canShare({ files: [testFile] })
+              );
+              console.log(
+                "- Can share text:",
+                navigator.canShare({ text: "test" })
+              );
+            }
+
+            const results = {
+              hasShare: !!navigator.share,
+              hasCanShare: !!navigator.canShare,
+              isPWA: !!window.navigator.standalone,
+              canShareFiles: navigator.canShare
+                ? navigator.canShare({ files: [new File([""], "test.txt")] })
+                : false,
+            };
+
+            alert(`Share API Test:\n${JSON.stringify(results, null, 2)}`);
+          }}
+        >
+          🧪 Test Share API
+        </button>
+
+        <button
+          className="bg-orange-600 text-white px-3 py-2 rounded text-sm hover:bg-orange-700"
+          onClick={async () => {
+            try {
+              const testData = JSON.stringify(
+                {
+                  test: "file location test",
+                  time: new Date().toISOString(),
+                  waypoints: waypoints.length,
+                  device: navigator.userAgent.includes("iPad")
+                    ? "iPad"
+                    : "other",
+                },
+                null,
+                2
+              );
+
+              const blob = new Blob([testData], { type: "application/json" });
+              const fileName = "FIND-ME-test.json";
+
+              // Force download method
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = fileName;
+              a.style.display = "none";
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+
+              console.log("🔍 Test download triggered - look for:", fileName);
+
+              alert(
+                `Test file '${fileName}' downloaded!\n\nLook for it in:\n• Files app → Downloads\n• Files app → On My iPad\n• Safari downloads (⬇️ icon)\n• Check browser downloads`
+              );
+            } catch (error) {
+              console.error("❌ Test download failed:", error);
+              alert(`❌ Test download failed: ${error.message}`);
+            }
+          }}
+        >
+          📁 Test Download
+        </button>
+
+        <button
+          className="bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700"
+          onClick={async () => {
+            try {
+              const testData = JSON.stringify(
+                {
+                  rally: "test share",
+                  time: new Date().toISOString(),
+                  waypoints: waypoints.length,
+                },
+                null,
+                2
+              );
+
+              const blob = new Blob([testData], { type: "application/json" });
+              const file = new File([blob], "rally-share-test.json", {
+                type: "application/json",
+              });
+
+              if (!navigator.share) {
+                throw new Error("navigator.share not available");
+              }
+
+              await navigator.share({
+                files: [file],
+                title: "Rally Mapper Share Test",
+                text: "Testing iOS share functionality",
+              });
+
+              console.log("✅ Share test successful!");
+              alert("✅ Share Sheet worked!");
+            } catch (err) {
+              console.error("❌ Share failed:", err.name, err.message);
+              alert(
+                `❌ Share failed: ${err.message}\n\nThis might be because:\n• Not in PWA mode\n• Browser doesn't support file sharing\n• No share targets available`
+              );
+            }
+          }}
+        >
+          📤 Test Share Sheet
+        </button>
+
+        <button
+          className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700"
+          onClick={async () => {
+            if (waypoints.length === 0) {
+              alert("❌ No waypoints to export! Add some waypoints first.");
+              return;
+            }
+
+            try {
+              setGpsError("🧪 Testing export with current waypoints...");
+
+              const testName = `test-export-${Date.now()}`;
+              const results = await Promise.allSettled([
+                exportAsJSON(waypoints, trackingPoints, testName),
+                exportAsGPX(waypoints, trackingPoints, testName),
+              ]);
+
+              const successCount = results.filter(
+                (r) => r.status === "fulfilled"
+              ).length;
+
+              setGpsError(
+                `🧪 Test complete: ${successCount}/2 exports succeeded`
+              );
+              setTimeout(() => setGpsError(null), 3000);
+
+              console.log("🧪 Export test results:", results);
+              alert(
+                `Export test complete!\n${successCount}/2 formats exported successfully.\nCheck console for details.`
+              );
+            } catch (error) {
+              console.error("❌ Export test failed:", error);
+              setGpsError("❌ Export test failed");
+              setTimeout(() => setGpsError(null), 3000);
+            }
+          }}
+        >
+          🧪 Test Export
+        </button>
       </div>
 
       {/* Voice Instructions - Collapsible */}

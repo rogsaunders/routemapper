@@ -147,10 +147,10 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
       <name>RallyMapper Voice</name>
     </author>
     <time>${new Date().toISOString()}</time>
-    <keywords>rally,navigation,voice,waypoints,instructions</keywords>
+    <keywords>rally,navigation,voice,waypoints</keywords>
   </metadata>`;
 
-  // Enhanced waypoints with Rally Navigator specific formatting
+  // Enhanced waypoints with Rally Navigator compatibility
   const waypointEntries = waypoints
     .map((wp, index) => {
       const iconInfo = mapCategoryToStandardIcon(
@@ -159,32 +159,28 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
       );
       const isVoiceCreated = wp.voiceCreated ? " (Voice)" : "";
 
-      // Create instruction-friendly name
-      const instructionName = wp.name;
-      const waypointNumber = (index + 1).toString().padStart(3, "0");
-
       // Fix the timestamp issue - create a proper date
       const waypointTime = wp.fullTimestamp
         ? new Date(wp.fullTimestamp).toISOString()
-        : new Date().toISOString();
+        : new Date().toISOString(); // fallback to current time
 
       return `
   <wpt lat="${wp.lat}" lon="${wp.lon}">
-    <name>WP${waypointNumber}: ${instructionName}${isVoiceCreated}</name>
-    <desc>${instructionName}</desc>
-    <cmt>${instructionName} - Distance: ${wp.distance}km${
-        wp.speedContext ? " - Speed: " + wp.speedContext : ""
-      }</cmt>
+    <name>WP${(index + 1).toString().padStart(3, "0")}: ${
+        wp.name
+      }${isVoiceCreated}</name>
+    <desc>${wp.name} - Distance: ${wp.distance}km - Category: ${
+        wp.category || "general"
+      }${wp.speedContext ? " - Speed: " + wp.speedContext : ""}${
+        wp.rawTranscript ? ' - Original: "' + wp.rawTranscript + '"' : ""
+      }</desc>
     <time>${waypointTime}</time>
-    <sym>${iconInfo.icon}</sym>
     <type>${iconInfo.gpxType}</type>
     <extensions>
       <category>${wp.category || "general"}</category>
       <priority>${iconInfo.priority}</priority>
       <voice_created>${wp.voiceCreated || false}</voice_created>
       <rally_icon>${iconInfo.icon}</rally_icon>
-      <instruction>${instructionName}</instruction>
-      <distance_km>${wp.distance}</distance_km>
       ${
         wp.speedContext
           ? `<speed_context>${wp.speedContext}</speed_context>`
@@ -195,23 +191,18 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
           ? `<original_transcript>${wp.rawTranscript}</original_transcript>`
           : ""
       }
-      ${
-        wp.processedText
-          ? `<processed_text>${wp.processedText}</processed_text>`
-          : ""
-      }
     </extensions>
   </wpt>`;
     })
     .join("");
 
-  // Enhanced route section with Rally Navigator specific route points
+  // Enhanced route section with navigation instructions
   const routeSection =
     waypoints.length > 1
       ? `
   <rte>
-    <name>${name} - Rally Instructions</name>
-    <desc>Rally navigation route with turn-by-turn instructions - ${
+    <name>${name} - Navigation Route</name>
+    <desc>Rally navigation route with ${
       waypoints.length
     } waypoints - Total distance: ${
           waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0
@@ -222,7 +213,6 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
         waypoints.filter((wp) => wp.voiceCreated).length
       }</voice_waypoints>
       <creation_date>${new Date().toISOString()}</creation_date>
-      <rally_instructions>true</rally_instructions>
     </extensions>
     ${waypoints
       .map((wp, index) => {
@@ -230,22 +220,15 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
           wp.category || "general",
           wp.name
         );
-        const waypointNumber = (index + 1).toString().padStart(3, "0");
-
         return `
     <rtept lat="${wp.lat}" lon="${wp.lon}">
-      <name>WP${waypointNumber}: ${wp.name}</name>
-      <desc>${wp.name}</desc>
-      <cmt>${wp.name} - ${wp.distance}km</cmt>
-      <sym>${iconInfo.icon}</sym>
+      <name>WP${(index + 1).toString().padStart(3, "0")}: ${wp.name}</name>
+      <desc>${wp.name} - ${wp.distance}km</desc>
       <type>${iconInfo.gpxType}</type>
       <extensions>
         <rally_instruction>${wp.name}</rally_instruction>
-        <instruction_text>${wp.name}</instruction_text>
         <distance_from_start>${wp.distance}</distance_from_start>
         <waypoint_category>${wp.category || "general"}</waypoint_category>
-        <waypoint_number>${index + 1}</waypoint_number>
-        <voice_created>${wp.voiceCreated || false}</voice_created>
       </extensions>
     </rtept>`;
       })

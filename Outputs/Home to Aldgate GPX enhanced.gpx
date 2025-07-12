@@ -1,0 +1,178 @@
+<?xml version="1.0" ?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" version="1.1" creator="RallyMapper">
+  <metadata>
+    <name>Home to aldgate</name>
+    <desc>Exported from RallyMapper-Voice-v2.0</desc>
+    <time>2025-07-12T02:03:20.033Z</time>
+  </metadata>
+  <wpt lat="-35.03331922814357" lon="138.74699749835577">
+    <name>Keep straight</name>
+    <desc>Keep straight</desc>
+    <sym>Straight</sym>
+    <type>navigation</type>
+    <time>2025-07-12T11:26:10:00Z</time>
+  </wpt>
+  <wpt lat="-35.03420893076192" lon="138.74761866196621">
+    <name>Right turn</name>
+    <desc>Write turn</desc>
+    <sym>Right</sym>
+    <type>navigation</type>
+    <time>2025-07-12T11:26:51:00Z</time>
+  </wpt>
+  <wpt lat="-35.03434114258505" lon="138.74619031914696">
+    <name>Right turn</name>
+    <desc>Right turn</desc>
+    <sym>Right</sym>
+    <type>navigation</type>
+    <time>2025-07-12T11:27:14:00Z</time>
+  </wpt>
+  <wpt lat="-35.03257894312409" lon="138.74433218602942">
+    <name>Keep left</name>
+    <desc>Keep left</desc>
+    <sym>Left</sym>
+    <type>navigation</type>
+    <time>2025-07-12T11:28:01:00Z</time>
+  </wpt>
+  <wpt lat="-35.02841181192307" lon="138.74133504846856">
+    <name>Keep right</name>
+    <desc>Keep right</desc>
+    <sym>Right</sym>
+    <type>navigation</type>
+    <time>2025-07-12T11:29:23:00Z</time>
+  </wpt>
+  <wpt lat="-35.02601964311531" lon="138.74090521256363">
+    <name>Keep straight</name>
+    <desc>Keep straight</desc>
+    <sym>Straight</sym>
+    <type>navigation</type>
+    <time>2025-07-12T11:29:52:00Z</time>
+  </wpt>
+  <wpt lat="-35.02231239955218" lon="138.74088155499155">
+    <name>Keep straight</name>
+    <desc>Keep straight</desc>
+    <sym>Straight</sym>
+    <type>navigation</type>
+    <time>2025-07-12T11:30:26:00Z</time>
+  </wpt>
+  <wpt lat="-35.01668425075372" lon="138.73868941397978">
+    <name>Left term</name>
+    <desc>Left term</desc>
+    <sym>Left</sym>
+    <type>navigation</type>
+    <time>2025-07-12T11:32:11:00Z</time>
+  </wpt>
+  <wpt lat="-35.0155106744993" lon="138.73695114447648">
+    <name>Left turn</name>
+    <desc>Left turn</desc>
+    <sym>Left</sym>
+    <type>navigation</type>
+    <time>2025-07-12T11:32:33:00Z</time>
+  </wpt>
+  <rte>
+    <name>Home to aldgate Route</name>
+    <rtept lat="-35.03331922814357" lon="138.74699749835577">
+      <name>Keep straight</name>
+      <desc>Keep straight</desc>
+    </rtept>
+    <rtept lat="-35.03420893076192" lon="138.74761866196621">
+      <name>Right turn</name>
+      <desc>Write turn</desc>
+    </rtept>
+    <rtept lat="-35.03434114258505" lon="138.74619031914696">
+      <name>Right turn</name>
+      <desc>Right turn</desc>
+    </rtept>
+    <rtept lat="-35.03257894312409" lon="138.74433218602942">
+      <name>Keep left</name>
+      <desc>Keep left</desc>
+    </rtept>
+    <rtept lat="-35.02841181192307" lon="138.74133504846856">
+      <name>Keep right</name>
+      <desc>Keep right</desc>
+    </rtept>
+    <rtept lat="-35.02601964311531" lon="138.74090521256363">
+      <name>Keep straight</name>
+      <desc>Keep straight</desc>
+    </rtept>
+    <rtept lat="-35.02231239955218" lon="138.74088155499155">
+      <name>Keep straight</name>
+      <desc>Keep straight</desc>
+    </rtept>
+    <rtept lat="-35.01668425075372" lon="138.73868941397978">
+      <name>Left term</name>
+      <desc>Left term</desc>
+    </rtept>
+    <rtept lat="-35.0155106744993" lon="138.73695114447648">
+      <name>Left turn</name>
+      <desc>Left turn</desc>
+    </rtept>
+  </rte>
+  <trk>
+    <name>Home to aldgate Track</name>
+    <trkseg>
+      <trkpt lat="-35.03358745185203" lon="138.7472215212116">
+        <time>2025-07-12T01:56:20.040Z</time>
+      </trkpt>
+      <trkpt lat="-35.034106574976086" lon="138.74760030201108">
+        <time>2025-07-12T01:56:40.044Z</time>
+      </trkpt>
+      <trkpt lat="-35.03431729722602" lon="138.74690616663423">
+        <time>2025-07-12T01:57:00.039Z</time>
+      </trkpt>
+      <trkpt lat="-35.03383744628995" lon="138.74596787555214">
+        <time>2025-07-12T01:57:20.043Z</time>
+      </trkpt>
+      <trkpt lat="-35.03268653902637" lon="138.7451825331093">
+        <time>2025-07-12T01:57:40.041Z</time>
+      </trkpt>
+      <trkpt lat="-35.03255902978855" lon="138.74428584436913">
+        <time>2025-07-12T01:58:00.039Z</time>
+      </trkpt>
+      <trkpt lat="-35.030984488689526" lon="138.74495061252003">
+        <time>2025-07-12T01:58:20.052Z</time>
+      </trkpt>
+      <trkpt lat="-35.02923195515517" lon="138.74406536275242">
+        <time>2025-07-12T01:58:40.048Z</time>
+      </trkpt>
+      <trkpt lat="-35.02737639103542" lon="138.74327119650368">
+        <time>2025-07-12T01:59:00.042Z</time>
+      </trkpt>
+      <trkpt lat="-35.02842109036818" lon="138.74122714847257">
+        <time>2025-07-12T01:59:20.036Z</time>
+      </trkpt>
+      <trkpt lat="-35.026662783787394" lon="138.7409118828503">
+        <time>2025-07-12T01:59:40.043Z</time>
+      </trkpt>
+      <trkpt lat="-35.0245832240661" lon="138.74111587003787">
+        <time>2025-07-12T02:00:00.038Z</time>
+      </trkpt>
+      <trkpt lat="-35.022445790972924" lon="138.74079741091333">
+        <time>2025-07-12T02:00:20.044Z</time>
+      </trkpt>
+      <trkpt lat="-35.02113197709895" lon="138.74252950197393">
+        <time>2025-07-12T02:00:40.042Z</time>
+      </trkpt>
+      <trkpt lat="-35.01922197557819" lon="138.74200932217653">
+        <time>2025-07-12T02:01:00.031Z</time>
+      </trkpt>
+      <trkpt lat="-35.01782320964319" lon="138.74067313494885">
+        <time>2025-07-12T02:01:20.039Z</time>
+      </trkpt>
+      <trkpt lat="-35.018330511822235" lon="138.73788767469026">
+        <time>2025-07-12T02:01:40.044Z</time>
+      </trkpt>
+      <trkpt lat="-35.01702048015623" lon="138.73836267482756">
+        <time>2025-07-12T02:02:00.035Z</time>
+      </trkpt>
+      <trkpt lat="-35.01594757499373" lon="138.73779173070216">
+        <time>2025-07-12T02:02:20.037Z</time>
+      </trkpt>
+      <trkpt lat="-35.01537390856937" lon="138.7365626019623">
+        <time>2025-07-12T02:02:40.048Z</time>
+      </trkpt>
+      <trkpt lat="-35.01560321339221" lon="138.73587946460646">
+        <time>2025-07-12T02:03:00.047Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

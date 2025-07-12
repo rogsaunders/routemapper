@@ -1515,6 +1515,151 @@ export default function App() {
     }
   };
 
+  const exportAsRallyNavigatorGPX = async (
+    waypointsData = waypoints,
+    trackingData = trackingPoints,
+    name = "route"
+  ) => {
+    try {
+      console.log("🔍 Starting Rally Navigator GPX export...");
+
+      // Rally Navigator optimized GPX structure
+      const rallyGPX = `<?xml version="1.0" encoding="UTF-8"?>
+  <gpx version="1.1" creator="RallyMapper-Voice" xmlns="http://www.topografix.com/GPX/1/1">
+    <metadata>
+      <name>${name}</name>
+      <desc>Rally route with voice instructions - ${
+        waypointsData.length
+      } waypoints</desc>
+      <time>${new Date().toISOString()}</time>
+    </metadata>
+    
+    <!-- Waypoints with Rally Navigator friendly format -->
+    ${waypointsData
+      .map((wp, index) => {
+        const waypointNumber = (index + 1).toString().padStart(3, "0");
+        return `
+    <wpt lat="${wp.lat}" lon="${wp.lon}">
+      <name>${waypointNumber} - ${wp.name}</name>
+      <desc>${wp.name}</desc>
+      <cmt>Rally instruction: ${wp.name} at ${wp.distance}km</cmt>
+      <type>waypoint</type>
+    </wpt>`;
+      })
+      .join("")}
+  
+    <!-- Route with turn instructions -->
+    <rte>
+      <name>${name} Instructions</name>
+      <desc>Rally route with ${waypointsData.length} instruction points</desc>
+      ${waypointsData
+        .map((wp, index) => {
+          const waypointNumber = (index + 1).toString().padStart(3, "0");
+          return `
+      <rtept lat="${wp.lat}" lon="${wp.lon}">
+        <name>${waypointNumber} - ${wp.name}</name>
+        <desc>${wp.name}</desc>
+        <cmt>${wp.name}</cmt>
+      </rtept>`;
+        })
+        .join("")}
+    </rte>
+  
+    ${
+      trackingData.length > 0
+        ? `
+    <!-- GPS Track -->
+    <trk>
+      <name>${name} Track</name>
+      <trkseg>
+        ${trackingData
+          .map(
+            (pt) => `
+        <trkpt lat="${pt.lat}" lon="${pt.lon}">
+          <time>${pt.timestamp || new Date().toISOString()}</time>
+        </trkpt>`
+          )
+          .join("")}
+      </trkseg>
+    </trk>`
+        : ""
+    }
+  </gpx>`;
+
+      const blob = new Blob([rallyGPX], { type: "application/gpx+xml" });
+      const fileName = `${name}-rally-navigator.gpx`;
+
+      // Try iOS Share Sheet
+      if (
+        navigator.canShare &&
+        navigator.canShare({
+          files: [new File([blob], fileName, { type: "application/gpx+xml" })],
+        })
+      ) {
+        try {
+          const file = new File([blob], fileName, {
+            type: "application/gpx+xml",
+          });
+          await navigator.share({
+            files: [file],
+            title: "Rally Navigator GPX Export",
+          });
+          console.log("✅ Rally Navigator GPX shared via iOS");
+          return true;
+        } catch (err) {
+          console.log(
+            "Rally Navigator GPX share failed, falling back to download:",
+            err.message
+          );
+        }
+      }
+
+      // Fallback download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      console.log("✅ Rally Navigator GPX download completed");
+      return true;
+    } catch (error) {
+      console.error("❌ Rally Navigator GPX export error:", error);
+      throw error;
+    }
+  };
+
+  // ADD THIS BUTTON TO YOUR DEBUG SECTION:
+  <button
+    className="bg-indigo-600 text-white px-3 py-2 rounded text-sm hover:bg-indigo-700"
+    onClick={async () => {
+      if (waypoints.length === 0) {
+        alert("❌ No waypoints to export! Add some waypoints first.");
+        return;
+      }
+
+      try {
+        setGpsError("📤 Exporting Rally Navigator GPX...");
+
+        const testName = routeName || `rally-route-${Date.now()}`;
+        await exportAsRallyNavigatorGPX(waypoints, trackingPoints, testName);
+
+        setGpsError("✅ Rally Navigator GPX exported!");
+        setTimeout(() => setGpsError(null), 3000);
+      } catch (error) {
+        console.error("❌ Rally Navigator export failed:", error);
+        setGpsError("❌ Rally Navigator export failed");
+        setTimeout(() => setGpsError(null), 3000);
+      }
+    }}
+  >
+    🧭 Rally Navigator GPX
+  </button>;
+
   const exportAsKML = async (
     waypointsData = waypoints,
     trackingData = trackingPoints,

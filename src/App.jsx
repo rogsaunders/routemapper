@@ -643,9 +643,12 @@ export default function App() {
     );
   };
 
-  const mapCenter = currentGPS
-    ? { lat: currentGPS.lat, lng: currentGPS.lon }
-    : { lat: -35.0, lng: 138.75 }; // fallback if GPS isn't ready
+  const mapCenter =
+    waypoints.length > 0
+      ? { lat: waypoints[0].lat, lng: waypoints[0].lon } // Center on first waypoint
+      : currentGPS
+      ? { lat: currentGPS.lat, lng: currentGPS.lon } // Or current GPS if no waypoints
+      : { lat: -35.0, lng: 138.75 };
 
   const startVoiceInput = () => {
     const SpeechRecognition =
@@ -2253,7 +2256,7 @@ export default function App() {
 
               <GoogleMap
                 mapContainerStyle={{ width: "100%", height: "100%" }}
-                center={{ lat: currentGPS.lat, lng: currentGPS.lon }}
+                center={mapCenter} // ← USE STATIC CENTER
                 zoom={mapZoom}
                 mapTypeId={mapType}
                 onZoomChanged={() => {
@@ -2829,7 +2832,7 @@ export default function App() {
         <stage className="mt-6">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-semibold">
-              🧭 Current stage Waypoints
+              🧭 Current Stage Waypoints
             </h2>
 
             {waypoints.length > 0 && (
@@ -2999,7 +3002,7 @@ export default function App() {
         </stage>
 
         <stage className="mt-6">
-          <h2 className="text-lg font-semibold mb-2">📋 stage Summaries</h2>
+          <h2 className="text-lg font-semibold mb-2">📋 Stage Summaries</h2>
           {stageSummaries.length === 0 ? (
             <p className="text-gray-500">No stages completed yet.</p>
           ) : (

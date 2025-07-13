@@ -24,7 +24,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2);
 }
 
-// Calculate cumulative distance from stage start
+// Calculate cumulative distance from section start
 function calculateCumulativeDistance(waypoints, currentLat, currentLon) {
   if (waypoints.length === 0) return 0;
 
@@ -205,8 +205,8 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
     })
     .join("");
 
-  // Enhanced route stage with Rally Navigator specific route points
-  const routestage =
+  // Enhanced route section with Rally Navigator specific route points
+  const routeSection =
     waypoints.length > 1
       ? `
   <rte>
@@ -280,7 +280,9 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
   const gpxFooter = `
 </gpx>`;
 
-  return gpxHeader + waypointEntries + routestage + trackingSegment + gpxFooter;
+  return (
+    gpxHeader + waypointEntries + routeSection + trackingSegment + gpxFooter
+  );
 }
 
 function buildKML(waypoints = [], trackingPoints = [], name = "Route") {
@@ -357,9 +359,9 @@ export default function App() {
   });
   const [routeName, setRouteName] = useState("");
   const [startGPS, setStartGPS] = useState(null);
-  const [stage, setstage] = useState([]);
-  const [stageSummaries, setstageSummaries] = useState([]);
-  const [stageName, setstageName] = useState("stage 1");
+  const [sections, setSections] = useState([]);
+  const [sectionSummaries, setSectionSummaries] = useState([]);
+  const [sectionName, setSectionName] = useState("Section 1");
   const [trackingPoints, setTrackingPoints] = useState([]);
   const [waypoints, setWaypoints] = useState([]);
   const [showReplay, setShowReplay] = useState(false);
@@ -368,15 +370,15 @@ export default function App() {
   const [currentGPS, setCurrentGPS] = useState(null);
   const [showMap, setShowMap] = useState(true);
   const [todayDate, setTodayDate] = useState("");
-  const [stageCount, setstageCount] = useState(1);
+  const [sectionCount, setSectionCount] = useState(1);
   const [fullScreenMap, setFullScreenMap] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
-  const [stageStarted, setstageStarted] = useState(false);
+  const [sectionStarted, setSectionStarted] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [totalDistance, setTotalDistance] = useState(0);
   const [selectedWaypoint, setSelectedWaypoint] = useState(null);
-  const [showEndstageConfirm, setShowEndstageConfirm] = useState(false);
-  const [showStartstageConfirm, setShowStartstageConfirm] = useState(false);
+  const [showEndSectionConfirm, setShowEndSectionConfirm] = useState(false);
+  const [showStartSectionConfirm, setShowStartSectionConfirm] = useState(false);
   // Add these new state variables for inline editing
   const [editingWaypoint, setEditingWaypoint] = useState(null); // Index of waypoint being edited
   const [editValues, setEditValues] = useState({ name: "", poi: "" }); // Temporary edit values
@@ -387,7 +389,7 @@ export default function App() {
   const [gpsLoading, setGpsLoading] = useState(true);
   const [gpsError, setGpsError] = useState(null);
   const [waypointAdded, setWaypointAdded] = useState(false);
-  const [stageLoading, setstageLoading] = useState(false);
+  const [sectionLoading, setSectionLoading] = useState(false);
   const [showUndo, setShowUndo] = useState(false);
   const [undoTimeLeft, setUndoTimeLeft] = useState(5);
   const [showVoiceInstructions, setShowVoiceInstructions] = useState(false); // Add this state
@@ -573,7 +575,7 @@ export default function App() {
     const timestamp = now.toLocaleTimeString();
     const fullTimestamp = now.toISOString(); // Add this line
 
-    // Calculate cumulative distance from stage start
+    // Calculate cumulative distance from section start
     const cumulativeDistance = startGPS
       ? calculateCumulativeDistance(waypoints, currentGPS.lat, currentGPS.lon)
       : 0;
@@ -602,9 +604,9 @@ export default function App() {
     setUndoTimeLeft(5);
   };
 
-  const handleStartstage = () => {
-    setstageLoading(true);
-    setstageStarted(true);
+  const handleStartSection = () => {
+    setSectionLoading(true);
+    setSectionStarted(true);
     setIsTracking(true); // ✅ Start tracking immediately
     setTrackingPoints([]); // ✅ Reset previous tracking points
     setWaypoints([]); // Optional: also reset waypoints if needed
@@ -614,7 +616,7 @@ export default function App() {
     if (!geo) {
       console.error("❌ Geolocation not supported");
       setGpsError("Geolocation not supported on this device");
-      setstageLoading(false);
+      setSectionLoading(false);
       setRefreshKey((prev) => prev + 1);
       return;
     }
@@ -626,18 +628,18 @@ export default function App() {
         setStartGPS(newGPS);
         setCurrentGPS(newGPS);
 
-        const stageName = `${todayDate}/stage ${stageCount}`;
-        setstages((prev) => [...prev, { name: stageName, waypoints: [] }]);
-        setstageName(stageName);
-        setstageCount((prev) => prev + 1);
-        setstageLoading(false);
+        const sectionName = `${todayDate}/Section ${sectionCount}`;
+        setSections((prev) => [...prev, { name: sectionName, waypoints: [] }]);
+        setSectionName(sectionName);
+        setSectionCount((prev) => prev + 1);
+        setSectionLoading(false);
 
-        console.log("✅ Start stage Initialized:", stageName, newGPS);
+        console.log("✅ Start Section Initialized:", sectionName, newGPS);
       },
       (err) => {
         console.error("❌ Failed to get GPS:", err);
         setGpsError("Failed to get starting GPS position. Please try again.");
-        setstageLoading(false);
+        setSectionLoading(false);
       },
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
@@ -778,35 +780,38 @@ export default function App() {
     const cleanText = transcript.trim().toLowerCase();
     console.log("🗣️ Processing global command:", cleanText);
 
-    // Handle stage start command (works before stage starts)
+    // Handle section start command (works before section starts)
     if (
-      cleanText.includes("stage start") ||
-      cleanText.includes("start stage")
+      cleanText.includes("section start") ||
+      cleanText.includes("start section")
     ) {
       if (waypoints.length > 0) {
-        setShowStartstageConfirm(true);
+        setShowStartSectionConfirm(true);
       } else {
-        handleStartstage();
+        handleStartSection();
       }
       return;
     }
 
-    // Handle stage end command (only works during stage)
-    if (cleanText.includes("stage end") || cleanText.includes("end stage")) {
-      if (stageStarted) {
-        setShowEndstageConfirm(true);
+    // Handle section end command (only works during section)
+    if (
+      cleanText.includes("section end") ||
+      cleanText.includes("end section")
+    ) {
+      if (sectionStarted) {
+        setShowEndSectionConfirm(true);
       } else {
-        setGpsError("No active stage to end.");
+        setGpsError("No active section to end.");
         setTimeout(() => setGpsError(null), 1000);
       }
       return;
     }
 
-    // If stage is started, use normal voice processing
-    if (stageStarted) {
+    // If section is started, use normal voice processing
+    if (sectionStarted) {
       processVoiceCommand(transcript);
     } else {
-      setGpsError("Start a stage first to add waypoints.");
+      setGpsError("Start a section first to add waypoints.");
       setTimeout(() => setGpsError(null), 1000);
     }
   };
@@ -1024,7 +1029,7 @@ export default function App() {
         // High speed - prefer brief, essential info
         processed = processed
           .replace(/followed by/g, "→")
-          .replace(/next stage/g, "next")
+          .replace(/next section/g, "next")
           .replace(/approximately/g, "~");
         break;
 
@@ -1058,18 +1063,18 @@ export default function App() {
     }
 
     if (
-      cleanText.toLowerCase().includes("stage start") ||
-      cleanText.toLowerCase().includes("start stage")
+      cleanText.toLowerCase().includes("section start") ||
+      cleanText.toLowerCase().includes("start section")
     ) {
-      handleStartstage();
+      handleStartSection();
       return;
     }
 
     if (
-      cleanText.toLowerCase().includes("stage end") ||
-      cleanText.toLowerCase().includes("end stage")
+      cleanText.toLowerCase().includes("section end") ||
+      cleanText.toLowerCase().includes("end section")
     ) {
-      setShowEndstageConfirm(true);
+      setShowEndSectionConfirm(true);
       return;
     }
 
@@ -1260,7 +1265,7 @@ export default function App() {
   const exportAsJSON = async (
     waypointsData = waypoints,
     trackingData = trackingPoints,
-    name = "stage"
+    name = "section"
   ) => {
     try {
       console.log("🔍 Starting JSON export...");
@@ -1378,7 +1383,7 @@ export default function App() {
   const exportAsSimpleJSON = async (
     waypointsData = waypoints,
     trackingData = trackingPoints,
-    name = "stage"
+    name = "section"
   ) => {
     try {
       console.log("🔍 Starting Simple JSON export...");
@@ -1628,7 +1633,7 @@ export default function App() {
     }
   };
 
-  // ADD THIS BUTTON TO YOUR DEBUG stage:
+  // ADD THIS BUTTON TO YOUR DEBUG SECTION:
   <button
     className="bg-indigo-600 text-white px-3 py-2 rounded text-sm hover:bg-indigo-700"
     onClick={async () => {
@@ -1859,16 +1864,16 @@ export default function App() {
     );
   };
 
-  const handleEndstage = async () => {
+  const handleEndSection = async () => {
     try {
-      setstageStarted(false);
+      setSectionStarted(false);
       setUndoTimeLeft(5);
 
-      const stageNameFormatted = `${todayDate}/stage ${stageCount}`;
-      const currentstage = { name: stageNameFormatted, waypoints };
+      const sectionNameFormatted = `${todayDate}/Section ${sectionCount}`;
+      const currentSection = { name: sectionNameFormatted, waypoints };
 
       const summary = {
-        name: stageNameFormatted,
+        name: sectionNameFormatted,
         waypointCount: waypoints.length,
         startTime: waypoints[0]?.timestamp || "N/A",
         endTime: waypoints[waypoints.length - 1]?.timestamp || "N/A",
@@ -1887,13 +1892,13 @@ export default function App() {
         routeName: routeName || "Unnamed Route",
       };
 
-      setstages((prev) => [...prev, currentstage]);
-      setstageSummaries((prev) => [...prev, summary]);
+      setSections((prev) => [...prev, currentSection]);
+      setSectionSummaries((prev) => [...prev, summary]);
 
       // Show user what's happening
       setGpsError("📤 Exporting files...");
 
-      const exportName = routeName || stageNameFormatted;
+      const exportName = routeName || sectionNameFormatted;
 
       // Export all formats with better error handling
       const exportResults = await Promise.allSettled([
@@ -1931,16 +1936,16 @@ export default function App() {
       setIsTracking(false);
       localStorage.removeItem("unsavedWaypoints");
 
-      console.log("stage ended and exports completed.");
+      console.log("Section ended and exports completed.");
     } catch (error) {
-      console.error("❌ handleEndstage error:", error);
-      setGpsError("❌ stage end failed. Check console.");
+      console.error("❌ handleEndSection error:", error);
+      setGpsError("❌ Section end failed. Check console.");
       setTimeout(() => setGpsError(null), 5000);
     }
   };
 
-  const StartstageConfirmDialog = () => {
-    if (!showStartstageConfirm) return null;
+  const StartSectionConfirmDialog = () => {
+    if (!showStartSectionConfirm) return null;
 
     return (
       <div
@@ -1976,7 +1981,7 @@ export default function App() {
               marginBottom: "16px",
             }}
           >
-            Start New stage?
+            Start New Section?
           </h3>
           <p
             style={{
@@ -1991,7 +1996,7 @@ export default function App() {
           </p>
           <div style={{ display: "flex", gap: "12px" }}>
             <button
-              onClick={() => setShowStartstageConfirm(false)}
+              onClick={() => setShowStartSectionConfirm(false)}
               style={{
                 flex: "1",
                 padding: "10px 16px",
@@ -2007,8 +2012,8 @@ export default function App() {
             </button>
             <button
               onClick={() => {
-                setShowStartstageConfirm(false);
-                handleStartstage();
+                setShowStartSectionConfirm(false);
+                handleStartSection();
               }}
               style={{
                 flex: "1",
@@ -2021,7 +2026,7 @@ export default function App() {
                 fontWeight: "500",
               }}
             >
-              Start New stage
+              Start New Section
             </button>
           </div>
         </div>
@@ -2029,8 +2034,8 @@ export default function App() {
     );
   };
 
-  const EndstageConfirmDialog = () => {
-    if (!showEndstageConfirm) return null;
+  const EndSectionConfirmDialog = () => {
+    if (!showEndSectionConfirm) return null;
 
     return (
       <div
@@ -2066,7 +2071,7 @@ export default function App() {
               marginBottom: "16px",
             }}
           >
-            End stage?
+            End Section?
           </h3>
           <p
             style={{
@@ -2080,7 +2085,7 @@ export default function App() {
           </p>
           <div style={{ display: "flex", gap: "12px" }}>
             <button
-              onClick={() => setShowEndstageConfirm(false)}
+              onClick={() => setShowEndSectionConfirm(false)}
               style={{
                 flex: "1",
                 padding: "10px 16px",
@@ -2096,8 +2101,8 @@ export default function App() {
             </button>
             <button
               onClick={() => {
-                setShowEndstageConfirm(false);
-                handleEndstage();
+                setShowEndSectionConfirm(false);
+                handleEndSection();
               }}
               style={{
                 flex: "1",
@@ -2110,7 +2115,7 @@ export default function App() {
                 fontWeight: "500",
               }}
             >
-              End stage
+              End Section
             </button>
           </div>
         </div>
@@ -2201,10 +2206,10 @@ export default function App() {
     <div className="p-4">
       {/* Success notification overlay */}
       <WaypointSuccessNotification />
-      {/* End stage Confirmation Dialog */}
-      <EndstageConfirmDialog />
-      {/* Start stage Confirmation Dialog */}
-      <StartstageConfirmDialog />
+      {/* End Section Confirmation Dialog */}
+      <EndSectionConfirmDialog />
+      {/* Start Section Confirmation Dialog */}
+      <StartSectionConfirmDialog />
 
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold text-blue-800 flex items-center gap-2">
@@ -2444,36 +2449,36 @@ export default function App() {
           />
           <input
             className="p-2 border rounded"
-            placeholder="stage Number"
-            value={stageName}
-            onChange={(e) => setstageName(e.target.value)}
+            placeholder="Section Number"
+            value={sectionName}
+            onChange={(e) => setSectionName(e.target.value)}
           />
           <button
             className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
             onClick={() => {
               if (waypoints.length > 0) {
-                setShowStartstageConfirm(true);
+                setShowStartSectionConfirm(true);
               } else {
-                handleStartstage();
+                handleStartSection();
               }
             }}
-            disabled={stageLoading || !currentGPS || stageStarted}
+            disabled={sectionLoading || !currentGPS || sectionStarted}
           >
-            {stageLoading ? (
+            {sectionLoading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 Starting...
               </>
             ) : (
-              <>▶️ Start stage</>
+              <>▶️ Start Section</>
             )}
           </button>
           <button
             className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
-            onClick={() => setShowEndstageConfirm(true)}
-            disabled={!stageStarted || waypoints.length === 0}
+            onClick={() => setShowEndSectionConfirm(true)}
+            disabled={!sectionStarted || waypoints.length === 0}
           >
-            ⏹ End stage
+            ⏹ End Section
           </button>
         </div>
       </div>
@@ -2667,7 +2672,8 @@ export default function App() {
                 onto gravel" • "Summit followed by descent"
               </p>
               <p>
-                <strong>Controls:</strong> "stage start" • "stage end" • "Undo"
+                <strong>Controls:</strong> "Section start" • "Section end" •
+                "Undo"
               </p>
               <p>
                 <strong>Tip:</strong> Speak naturally - any description becomes
@@ -2715,7 +2721,7 @@ export default function App() {
           <button
             onClick={handleAddWaypoint}
             type="button"
-            disabled={!currentGPS || !stageStarted}
+            disabled={!currentGPS || !sectionStarted}
             style={{
               padding: "18px 16px",
               borderRadius: "8px",
@@ -2726,13 +2732,14 @@ export default function App() {
               alignItems: "center",
               gap: "8px",
               backgroundColor:
-                !currentGPS || !stageStarted
+                !currentGPS || !sectionStarted
                   ? "#9CA3AF"
                   : waypointAdded
                   ? "#059669"
                   : "#2563EB",
               color: "white",
-              cursor: !currentGPS || !stageStarted ? "not-allowed" : "pointer",
+              cursor:
+                !currentGPS || !sectionStarted ? "not-allowed" : "pointer",
               border: "2px solid #1e3a8a",
             }}
           >
@@ -2764,9 +2771,11 @@ export default function App() {
           )}
 
           <button
-            onClick={stageStarted ? startVoiceInput : handleGlobalVoiceCommands}
+            onClick={
+              sectionStarted ? startVoiceInput : handleGlobalVoiceCommands
+            }
             type="button"
-            disabled={!stageStarted}
+            disabled={!sectionStarted}
             style={{
               padding: "18px 16px",
               borderRadius: "8px",
@@ -2776,13 +2785,13 @@ export default function App() {
               display: "flex",
               alignItems: "center",
               gap: "12px",
-              backgroundColor: !stageStarted
+              backgroundColor: !sectionStarted
                 ? "#9ca3af92"
                 : recognitionActive
                 ? "#EF4444"
                 : "#2563EB",
               color: "white",
-              cursor: !stageStarted ? "not-allowed" : "pointer",
+              cursor: !sectionStarted ? "not-allowed" : "pointer",
               border: "2px solid #1e3a8a",
               boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
             }}
@@ -2792,7 +2801,7 @@ export default function App() {
                 <div className="w-4 h-4 bg-white rounded-full animate-pulse"></div>
                 Listening...
               </>
-            ) : stageStarted ? (
+            ) : sectionStarted ? (
               <>🎤 Add Location</>
             ) : (
               <>🎤 Voice Commands</>
@@ -2804,14 +2813,14 @@ export default function App() {
               padding: "18px 16px",
               borderRadius: "8px",
               fontSize: "1.0rem",
-              backgroundColor: !stageStarted ? "#E5E7EB" : "#D1D5DB",
+              backgroundColor: !sectionStarted ? "#E5E7EB" : "#D1D5DB",
               color: "black",
               border: "2px solid #1e3a8a",
-              cursor: !stageStarted ? "not-allowed" : "pointer",
+              cursor: !sectionStarted ? "not-allowed" : "pointer",
             }}
             onClick={() => alert("Photo feature not yet implemented")}
             type="button"
-            disabled={!stageStarted}
+            disabled={!sectionStarted}
           >
             📷 Photo
           </button>
@@ -2826,10 +2835,10 @@ export default function App() {
         </div>
 
         {/* Waypoints List */}
-        <stage className="mt-6">
+        <section className="mt-6">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-semibold">
-              🧭 Current stage Waypoints
+              🧭 Current Section Waypoints
             </h2>
 
             {waypoints.length > 0 && (
@@ -2996,14 +3005,14 @@ export default function App() {
               ))
             )}
           </div>
-        </stage>
+        </section>
 
-        <stage className="mt-6">
-          <h2 className="text-lg font-semibold mb-2">📋 stage Summaries</h2>
-          {stageSummaries.length === 0 ? (
-            <p className="text-gray-500">No stages completed yet.</p>
+        <section className="mt-6">
+          <h2 className="text-lg font-semibold mb-2">📋 Section Summaries</h2>
+          {sectionSummaries.length === 0 ? (
+            <p className="text-gray-500">No sections completed yet.</p>
           ) : (
-            stageSummaries.map((summary, idx) => (
+            sectionSummaries.map((summary, idx) => (
               <div key={idx} className="bg-white shadow rounded p-3 mb-2">
                 <h3 className="font-bold text-blue-700">{summary.name}</h3>
                 {summary.routeName && (
@@ -3023,7 +3032,7 @@ export default function App() {
               </div>
             ))
           )}
-        </stage>
+        </section>
       </div>
     </div>
   );

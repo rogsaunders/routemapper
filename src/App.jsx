@@ -359,7 +359,7 @@ export default function App() {
   const [startGPS, setStartGPS] = useState(null);
   const [stage, setstage] = useState([]);
   const [stageSummaries, setstageSummaries] = useState([]);
-  const [stageName, setstageName] = useState("stage 1");
+  const [stageName, setstageName] = useState("Stage 1");
   const [trackingPoints, setTrackingPoints] = useState([]);
   const [waypoints, setWaypoints] = useState([]);
   const [showReplay, setShowReplay] = useState(false);
@@ -626,7 +626,7 @@ export default function App() {
         setStartGPS(newGPS);
         setCurrentGPS(newGPS);
 
-        const stageName = `${todayDate}/stage ${stageCount}`;
+        const stageName = `${todayDate}/Stage ${stageCount}`;
         setstages((prev) => [...prev, { name: stageName, waypoints: [] }]);
         setstageName(stageName);
         setstageCount((prev) => prev + 1);
@@ -2447,7 +2447,7 @@ export default function App() {
           />
           <input
             className="p-2 border rounded"
-            placeholder="stage Number"
+            placeholder="Stage Number"
             value={stageName}
             onChange={(e) => setstageName(e.target.value)}
           />

@@ -627,7 +627,7 @@ export default function App() {
         setCurrentGPS(newGPS);
 
         const stageName = `${todayDate}/Stage ${stageCount}`;
-        setstages((prev) => [...prev, { name: stageName, waypoints: [] }]);
+        setstage((prev) => [...prev, { name: stageName, waypoints: [] }]);
         setstageName(stageName);
         setstageCount((prev) => prev + 1);
         setstageLoading(false);
@@ -1867,7 +1867,7 @@ export default function App() {
       setstageStarted(false);
       setUndoTimeLeft(5);
 
-      const stageNameFormatted = `${todayDate}/stage ${stageCount}`;
+      const stageNameFormatted = `${todayDate}/Stage ${stageCount}`;
       const currentstage = { name: stageNameFormatted, waypoints };
 
       const summary = {
@@ -1890,7 +1890,7 @@ export default function App() {
         routeName: routeName || "Unnamed Route",
       };
 
-      setstages((prev) => [...prev, currentstage]);
+      setstage((prev) => [...prev, currentstage]);
       setstageSummaries((prev) => [...prev, summary]);
 
       // Show user what's happening
@@ -2829,7 +2829,7 @@ export default function App() {
         </div>
 
         {/* Waypoints List */}
-        <stage className="mt-6">
+        <section className="mt-6">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-semibold">
               🧭 Current Stage Waypoints
@@ -2999,9 +2999,9 @@ export default function App() {
               ))
             )}
           </div>
-        </stage>
+        </section>
 
-        <stage className="mt-6">
+        <section className="mt-6">
           <h2 className="text-lg font-semibold mb-2">📋 Stage Summaries</h2>
           {stageSummaries.length === 0 ? (
             <p className="text-gray-500">No stages completed yet.</p>
@@ -3026,7 +3026,7 @@ export default function App() {
               </div>
             ))
           )}
-        </stage>
+        </section>
       </div>
     </div>
   );

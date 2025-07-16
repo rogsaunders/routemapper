@@ -349,6 +349,136 @@ function buildKML(waypoints = [], trackingPoints = [], name = "Route") {
   );
 }
 
+const exportFileIPadCompatible = async (
+  content,
+  filename,
+  mimeType,
+  title = "Rally Mapper Export"
+) => {
+  try {
+    console.log(`🔍 Starting iPad-compatible export: ${filename}`);
+
+    // Debug environment first
+    const env = {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      isIPad: /iPad|iPhone|iPod/.test(navigator.userAgent),
+      isPWA: window.navigator.standalone,
+      isIOSSafari:
+        /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
+      canShare: !!navigator.canShare,
+      canShareFiles: navigator.canShare
+        ? navigator.canShare({ files: [new File([""], "test.txt")] })
+        : false,
+      downloadSupport: "download" in document.createElement("a"),
+      blobSupport: !!window.Blob,
+      urlSupport: !!window.URL,
+    };
+
+    console.log("🔍 Export Environment:", env);
+
+    const blob = new Blob([content], { type: mimeType });
+    console.log(`📄 Blob created: ${blob.size} bytes, type: ${blob.type}`);
+
+    // METHOD 1: Try iOS Share Sheet (Most reliable on iPad)
+    if (env.canShare && env.canShareFiles) {
+      try {
+        const file = new File([blob], filename, { type: mimeType });
+        console.log(`📤 Attempting share sheet: ${file.name}`);
+
+        await navigator.share({
+          files: [file],
+          title: title,
+          text: `Rally route export: ${filename}`,
+        });
+
+        console.log("✅ Share sheet successful");
+        return { success: true, method: "share_sheet" };
+      } catch (shareErr) {
+        console.log("⚠️ Share sheet failed:", shareErr.message);
+        // Continue to fallback methods
+      }
+    }
+
+    // METHOD 2: Direct download (works in some iPad browsers)
+    if (env.downloadSupport && env.urlSupport) {
+      try {
+        console.log("📥 Attempting direct download");
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.style.display = "none";
+
+        // Add to DOM, click, remove - iPad sometimes needs this
+        document.body.appendChild(a);
+
+        // Give iPad time to process
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        a.click();
+
+        // Clean up after delay
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 1000);
+
+        console.log("✅ Direct download triggered");
+        return { success: true, method: "direct_download" };
+      } catch (downloadErr) {
+        console.log("⚠️ Direct download failed:", downloadErr.message);
+      }
+    }
+
+    // METHOD 3: Open in new window (iPad fallback)
+    try {
+      console.log("🔗 Attempting new window method");
+
+      const url = URL.createObjectURL(blob);
+      const newWindow = window.open(url, "_blank");
+
+      if (newWindow) {
+        // Clean up after window opens
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        console.log("✅ New window opened");
+        return { success: true, method: "new_window" };
+      } else {
+        throw new Error("Popup blocked");
+      }
+    } catch (windowErr) {
+      console.log("⚠️ New window failed:", windowErr.message);
+    }
+
+    // METHOD 4: Data URL (last resort)
+    try {
+      console.log("📋 Attempting data URL method");
+
+      const reader = new FileReader();
+      return new Promise((resolve) => {
+        reader.onload = () => {
+          const dataUrl = reader.result;
+          const a = document.createElement("a");
+          a.href = dataUrl;
+          a.download = filename;
+          a.click();
+          console.log("✅ Data URL method triggered");
+          resolve({ success: true, method: "data_url" });
+        };
+        reader.readAsDataURL(blob);
+      });
+    } catch (dataErr) {
+      console.log("⚠️ Data URL failed:", dataErr.message);
+    }
+
+    throw new Error("All export methods failed");
+  } catch (error) {
+    console.error(`❌ Export failed for ${filename}:`, error);
+    return { success: false, error: error.message };
+  }
+};
+
 const libraries = []; // declared outside the component or at top level
 export default function App() {
   const { isLoaded } = useJsApiLoader({
@@ -1266,7 +1396,7 @@ export default function App() {
     name = "stage"
   ) => {
     try {
-      console.log("🔍 Starting JSON export...");
+      console.log("🔍 Starting Enhanced JSON export (iPad compatible)...");
 
       const voiceWaypoints = waypointsData.filter(
         (wp) => wp.voiceCreated
@@ -1332,48 +1462,19 @@ export default function App() {
         },
       };
 
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: "application/json",
-      });
+      // ✅ USE IPAD-COMPATIBLE HELPER (this was missing!)
+      const content = JSON.stringify(data, null, 2);
+      const result = await exportFileIPadCompatible(
+        content,
+        `${name}-enhanced.json`,
+        "application/json",
+        "Rally Mapper Enhanced JSON"
+      );
 
-      const fileName = `${name}-enhanced.json`;
-
-      // Try iOS Share Sheet first (works better in PWA)
-      if (
-        navigator.canShare &&
-        navigator.canShare({
-          files: [new File([blob], fileName, { type: "application/json" })],
-        })
-      ) {
-        try {
-          const file = new File([blob], fileName, { type: "application/json" });
-          await navigator.share({
-            files: [file],
-            title: "Rally Mapper Enhanced JSON",
-            text: `Rally route: ${name}`,
-          });
-          console.log("✅ Enhanced JSON shared via iOS");
-          return true;
-        } catch (err) {
-          console.log("Share failed, falling back to download:", err.message);
-        }
-      }
-
-      // Fallback to download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      console.log("✅ Enhanced JSON downloaded");
-      return true;
+      console.log("Enhanced JSON export result:", result);
+      return result.success;
     } catch (error) {
-      console.error("❌ JSON export failed:", error);
+      console.error("❌ Enhanced JSON export failed:", error);
       throw error;
     }
   };
@@ -1384,7 +1485,7 @@ export default function App() {
     name = "stage"
   ) => {
     try {
-      console.log("🔍 Starting Simple JSON export...");
+      console.log("🔍 Starting Simple JSON export (iPad compatible)...");
 
       const data = {
         name: routeName || name,
@@ -1410,47 +1511,18 @@ export default function App() {
             : null,
       };
 
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: "application/json",
-      });
+      const content = JSON.stringify(data, null, 2);
+      const result = await exportFileIPadCompatible(
+        content,
+        `${name}-simple.json`,
+        "application/json",
+        "Rally Mapper Simple JSON"
+      );
 
-      const fileName = `${name}-simple.json`;
-
-      // Try iOS Share Sheet
-      if (
-        navigator.canShare &&
-        navigator.canShare({
-          files: [new File([blob], fileName, { type: "application/json" })],
-        })
-      ) {
-        try {
-          const file = new File([blob], fileName, { type: "application/json" });
-          await navigator.share({
-            files: [file],
-            title: "Rally Mapper Simple JSON",
-          });
-          console.log("✅ Simple JSON shared via iOS");
-          return true;
-        } catch (err) {
-          console.log("Share failed, falling back to download:", err.message);
-        }
-      }
-
-      // Fallback download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      console.log("✅ Simple JSON downloaded");
-      return true;
+      console.log("Simple JSON export result:", result);
+      return result.success;
     } catch (error) {
-      console.error("❌ Simple JSON export error:", error);
+      console.error("❌ Simple JSON export failed:", error);
       throw error;
     }
   };
@@ -1519,7 +1591,9 @@ export default function App() {
     name = "route"
   ) => {
     try {
-      console.log("🔍 Starting Rally Navigator GPX export...");
+      console.log(
+        "🔍 Starting Rally Navigator GPX export (iPad compatible)..."
+      );
 
       // Rally Navigator optimized GPX structure
       const rallyGPX = `<?xml version="1.0" encoding="UTF-8"?>
@@ -1584,49 +1658,18 @@ export default function App() {
     }
   </gpx>`;
 
-      const blob = new Blob([rallyGPX], { type: "application/gpx+xml" });
-      const fileName = `${name}-rally-navigator.gpx`;
+      // ✅ USE IPAD-COMPATIBLE HELPER (this was missing!)
+      const result = await exportFileIPadCompatible(
+        rallyGPX,
+        `${name}-rally-navigator.gpx`,
+        "application/gpx+xml",
+        "Rally Navigator GPX Export"
+      );
 
-      // Try iOS Share Sheet
-      if (
-        navigator.canShare &&
-        navigator.canShare({
-          files: [new File([blob], fileName, { type: "application/gpx+xml" })],
-        })
-      ) {
-        try {
-          const file = new File([blob], fileName, {
-            type: "application/gpx+xml",
-          });
-          await navigator.share({
-            files: [file],
-            title: "Rally Navigator GPX Export",
-          });
-          console.log("✅ Rally Navigator GPX shared via iOS");
-          return true;
-        } catch (err) {
-          console.log(
-            "Rally Navigator GPX share failed, falling back to download:",
-            err.message
-          );
-        }
-      }
-
-      // Fallback download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      console.log("✅ Rally Navigator GPX download completed");
-      return true;
+      console.log("Rally Navigator GPX export result:", result);
+      return result.success;
     } catch (error) {
-      console.error("❌ Rally Navigator GPX export error:", error);
+      console.error("❌ Rally Navigator GPX export failed:", error);
       throw error;
     }
   };
@@ -1664,59 +1707,20 @@ export default function App() {
     name = "route"
   ) => {
     try {
-      console.log("🔍 Starting KML export...");
+      console.log("🔍 Starting KML export (iPad compatible)...");
 
       const kmlContent = buildKML(waypointsData, trackingData, name);
-      const blob = new Blob([kmlContent], {
-        type: "application/vnd.google-earth.kml+xml",
-      });
+      const result = await exportFileIPadCompatible(
+        kmlContent,
+        `${name}.kml`,
+        "application/vnd.google-earth.kml+xml",
+        "Rally Mapper KML Export"
+      );
 
-      const fileName = `${name}.kml`;
-
-      // Try iOS Share Sheet
-      if (
-        navigator.canShare &&
-        navigator.canShare({
-          files: [
-            new File([blob], fileName, {
-              type: "application/vnd.google-earth.kml+xml",
-            }),
-          ],
-        })
-      ) {
-        try {
-          const file = new File([blob], fileName, {
-            type: "application/vnd.google-earth.kml+xml",
-          });
-          await navigator.share({
-            files: [file],
-            title: "Rally Mapper KML Export",
-          });
-          console.log("✅ KML shared via iOS");
-          return true;
-        } catch (err) {
-          console.log(
-            "KML share failed, falling back to download:",
-            err.message
-          );
-        }
-      }
-
-      // Fallback download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      console.log("✅ KML download completed");
-      return true;
+      console.log("KML export result:", result);
+      return result.success;
     } catch (error) {
-      console.error("❌ KML export error:", error);
+      console.error("❌ KML export failed:", error);
       throw error;
     }
   };
@@ -1894,50 +1898,93 @@ export default function App() {
       setstageSummaries((prev) => [...prev, summary]);
 
       // Show user what's happening
-      setGpsError("📤 Exporting files...");
+      setGpsError("📤 Exporting files (iPad compatible)...");
 
       const exportName = routeName || stageNameFormatted;
 
-      // Export all formats with better error handling
-      const exportResults = await Promise.allSettled([
-        exportAsJSON(waypoints, trackingPoints, exportName),
-        exportAsSimpleJSON(waypoints, trackingPoints, exportName),
-        exportAsGPX(waypoints, trackingPoints, exportName),
-        exportAsKML(waypoints, trackingPoints, exportName),
-      ]);
+      console.log("🔍 === MAIN EXPORT PROCESS START ===");
+      console.log("Export name:", exportName);
+      console.log("Waypoints:", waypoints.length);
+      console.log("Tracking points:", trackingPoints.length);
+
+      // Use iPad-compatible export functions with individual error handling
+      const exportPromises = [
+        exportAsJSON(waypoints, trackingPoints, exportName).catch((err) => {
+          console.error("JSON export failed:", err);
+          return false;
+        }),
+        exportAsSimpleJSON(waypoints, trackingPoints, exportName).catch(
+          (err) => {
+            console.error("Simple JSON export failed:", err);
+            return false;
+          }
+        ),
+        exportAsGPX(waypoints, trackingPoints, exportName).catch((err) => {
+          console.error("GPX export failed:", err);
+          return false;
+        }),
+        exportAsKML(waypoints, trackingPoints, exportName).catch((err) => {
+          console.error("KML export failed:", err);
+          return false;
+        }),
+      ];
+
+      // Wait for all exports to complete
+      const exportResults = await Promise.allSettled(exportPromises);
 
       // Count successful exports
-      const successCount = exportResults.filter(
-        (result) => result.status === "fulfilled"
-      ).length;
-
-      if (successCount === exportResults.length) {
-        setGpsError("✅ All files exported successfully!");
-      } else if (successCount > 0) {
-        setGpsError(
-          `⚠️ ${successCount}/${exportResults.length} files exported successfully`
-        );
-      } else {
-        setGpsError("❌ Export failed. Check console for details.");
-      }
-
-      // Log any failures
-      exportResults.forEach((result, index) => {
-        if (result.status === "rejected") {
-          console.error(`Export ${index} failed:`, result.reason);
+      let successCount = 0;
+      const results = exportResults.map((result, index) => {
+        const formatNames = ["Enhanced JSON", "Simple JSON", "GPX", "KML"];
+        if (result.status === "fulfilled" && result.value === true) {
+          successCount++;
+          console.log(`✅ ${formatNames[index]} export successful`);
+          return true;
+        } else {
+          console.error(
+            `❌ ${formatNames[index]} export failed:`,
+            result.reason || result.value
+          );
+          return false;
         }
       });
 
-      setTimeout(() => setGpsError(null), 8000);
+      console.log("🔍 Export results:", results);
+      console.log("🔍 === MAIN EXPORT PROCESS END ===");
+
+      // Provide detailed feedback
+      if (successCount === exportResults.length) {
+        setGpsError("✅ All 4 files exported successfully!");
+      } else if (successCount > 0) {
+        const formatNames = ["Enhanced JSON", "Simple JSON", "GPX", "KML"];
+        const successful = results
+          .map((success, i) => (success ? formatNames[i] : null))
+          .filter(Boolean);
+        const failed = results
+          .map((success, i) => (!success ? formatNames[i] : null))
+          .filter(Boolean);
+
+        setGpsError(
+          `⚠️ ${successCount}/${
+            exportResults.length
+          } files exported.\n✅ ${successful.join(", ")}\n❌ ${failed.join(
+            ", "
+          )}`
+        );
+      } else {
+        setGpsError("❌ All exports failed. Check console for details.");
+      }
+
+      setTimeout(() => setGpsError(null), 10000); // Longer display time for detailed message
 
       setRefreshKey((prev) => prev + 1);
       setIsTracking(false);
       localStorage.removeItem("unsavedWaypoints");
 
-      console.log("stage ended and exports completed.");
+      console.log("Stage ended and exports completed.");
     } catch (error) {
       console.error("❌ handleEndstage error:", error);
-      setGpsError("❌ stage end failed. Check console.");
+      setGpsError("❌ Stage end failed. Check console.");
       setTimeout(() => setGpsError(null), 5000);
     }
   };
@@ -2519,7 +2566,6 @@ export default function App() {
         >
           🧪 Test Share API
         </button>
-
         <button
           className="bg-orange-600 text-white px-3 py-2 rounded text-sm hover:bg-orange-700"
           onClick={async () => {
@@ -2564,7 +2610,6 @@ export default function App() {
         >
           📁 Test Download
         </button>
-
         <button
           className="bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700"
           onClick={async () => {
@@ -2606,7 +2651,6 @@ export default function App() {
         >
           📤 Test Share Sheet
         </button>
-
         <button
           className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700"
           onClick={async () => {
@@ -2645,6 +2689,60 @@ export default function App() {
           }}
         >
           🧪 Test Export
+        </button>
+        <button
+          className="bg-purple-600 text-white px-3 py-2 rounded text-sm hover:bg-purple-700"
+          onClick={async () => {
+            if (waypoints.length === 0) {
+              alert("❌ No waypoints to export! Add some waypoints first.");
+              return;
+            }
+
+            console.log("🔍 === TESTING MAIN EXPORT PROCESS ===");
+
+            try {
+              setGpsError("🧪 Testing main export process...");
+
+              const testName = routeName || `main-export-test-${Date.now()}`;
+
+              // Test the exact same process as End Stage
+              const results = await Promise.allSettled([
+                exportAsJSON(waypoints, trackingPoints, testName),
+                exportAsSimpleJSON(waypoints, trackingPoints, testName),
+                exportAsGPX(waypoints, trackingPoints, testName),
+                exportAsKML(waypoints, trackingPoints, testName),
+              ]);
+
+              const successCount = results.filter(
+                (r) => r.status === "fulfilled" && r.value === true
+              ).length;
+              const formatNames = [
+                "Enhanced JSON",
+                "Simple JSON",
+                "GPX",
+                "KML",
+              ];
+
+              results.forEach((result, index) => {
+                console.log(`${formatNames[index]}:`, result);
+              });
+
+              setGpsError(
+                `🧪 Main process test: ${successCount}/4 exports succeeded`
+              );
+              setTimeout(() => setGpsError(null), 5000);
+
+              alert(
+                `Main Export Process Test:\n\n${successCount}/4 formats exported successfully.\n\nCheck console for detailed results.`
+              );
+            } catch (error) {
+              console.error("❌ Main export test failed:", error);
+              setGpsError("❌ Main export test failed");
+              setTimeout(() => setGpsError(null), 3000);
+            }
+          }}
+        >
+          🧪 Test Main Export Process
         </button>
       </div>
 

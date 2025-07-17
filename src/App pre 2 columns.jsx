@@ -2925,167 +2925,105 @@ export default function App() {
             </div>
           )}
         </div>
+
         {/* Waypoints List */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          {/* LEFT COLUMN: Complete Current Stage Waypoints Section */}
+          <div>
+            <section className="mt-6">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-lg font-semibold">
+                  🧭 Current Stage Waypoints
+                </h2>
 
-        {/* Two-Column Layout using Inline Styles */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: window.innerWidth >= 768 ? "row" : "column",
-            gap: "24px",
-            marginTop: "24px",
-          }}
-        >
-          {/* LEFT COLUMN: Current Stage Waypoints */}
-          <div style={{ flex: 1 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: "8px",
-              }}
-            >
-              <h2 className="text-lg font-semibold">
-                🧭 Current Stage Waypoints
-              </h2>
-
-              {waypoints.length > 0 && (
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                >
-                  {bulkSelectMode && (
-                    <>
-                      <span className="text-sm text-gray-600">
-                        {selectedWaypoints.size} selected
-                      </span>
-                      <button
-                        onClick={selectAllWaypoints}
-                        className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
-                      >
-                        {selectedWaypoints.size === waypoints.length
-                          ? "Deselect All"
-                          : "Select All"}
-                      </button>
-                      {selectedWaypoints.size > 0 && (
+                {waypoints.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    {bulkSelectMode && (
+                      <>
+                        <span className="text-sm text-gray-600">
+                          {selectedWaypoints.size} selected
+                        </span>
                         <button
-                          onClick={deleteSelectedWaypoints}
-                          className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                          onClick={selectAllWaypoints}
+                          className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
                         >
-                          Delete ({selectedWaypoints.size})
+                          {selectedWaypoints.size === waypoints.length
+                            ? "Deselect All"
+                            : "Select All"}
                         </button>
-                      )}
-                    </>
-                  )}
-                  <button
-                    onClick={toggleBulkSelectMode}
-                    className={`px-3 py-1 rounded text-sm ${
-                      bulkSelectMode
-                        ? "bg-gray-500 text-white hover:bg-gray-600"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    }`}
-                  >
-                    {bulkSelectMode ? "Exit Select" : "Select Multiple"}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div
-              ref={waypointListRef}
-              style={{
-                maxHeight: "40vh",
-                overflowY: "auto",
-                paddingRight: "4px",
-              }}
-            >
-              {waypoints.length === 0 ? (
-                <p className="text-gray-500">No waypoints added yet.</p>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
-                  }}
-                >
-                  {waypoints.map((wp, idx) => (
+                        {selectedWaypoints.size > 0 && (
+                          <button
+                            onClick={deleteSelectedWaypoints}
+                            className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                          >
+                            Delete ({selectedWaypoints.size})
+                          </button>
+                        )}
+                      </>
+                    )}
+                    <button
+                      onClick={toggleBulkSelectMode}
+                      className={`px-3 py-1 rounded text-sm ${
+                        bulkSelectMode
+                          ? "bg-gray-500 text-white hover:bg-gray-600"
+                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      }`}
+                    >
+                      {bulkSelectMode ? "Exit Select" : "Select Multiple"}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div
+                ref={waypointListRef}
+                className="max-h-[40vh] overflow-y-auto pr-1 space-y-2"
+              >
+                {waypoints.length === 0 ? (
+                  <p className="text-gray-500">No waypoints added yet.</p>
+                ) : (
+                  waypoints.map((wp, idx) => (
                     <div key={idx} className="bg-gray-100 p-3 rounded">
                       {/* Add checkbox for bulk selection */}
                       {bulkSelectMode && (
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            marginBottom: "8px",
-                          }}
-                        >
+                        <div className="flex items-center mb-2">
                           <input
                             type="checkbox"
                             checked={selectedWaypoints.has(idx)}
                             onChange={() => toggleWaypointSelection(idx)}
-                            style={{ marginRight: "8px" }}
-                            className="w-4 h-4"
+                            className="mr-2 w-4 h-4"
                           />
                           <span className="text-sm text-gray-600">
                             Select for bulk operations
                           </span>
                         </div>
                       )}
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          marginBottom: "8px",
-                        }}
-                      >
+                      <div className="flex items-center gap-2 mb-2">
                         {/* Only show icon if waypoint has an iconSrc */}
                         {wp.iconSrc && (
                           <img
                             src={wp.iconSrc}
-                            className="w-6 h-6"
+                            className="w-6 h-6 mr-2"
                             alt={wp.name}
-                            style={{ marginRight: "8px" }}
                           />
                         )}
                         {/* Show voice indicator for voice-created waypoints, icon for manual ones */}
                         {wp.voiceCreated ? (
-                          <div
-                            style={{
-                              width: "24px",
-                              height: "24px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              marginRight: "8px",
-                            }}
-                          >
+                          <div className="w-6 h-6 flex items-center justify-center mr-2">
                             <span className="text-blue-500">🎤</span>
                           </div>
                         ) : wp.iconSrc ? (
                           <img
                             src={wp.iconSrc}
-                            className="w-6 h-6"
+                            className="w-6 h-6 mr-2"
                             alt={wp.name}
-                            style={{ marginRight: "8px" }}
                           />
                         ) : (
-                          <div
-                            style={{
-                              width: "24px",
-                              height: "24px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              marginRight: "8px",
-                            }}
-                          >
+                          <div className="w-6 h-6 flex items-center justify-center mr-2">
                             <span className="text-gray-400">📍</span>
                           </div>
                         )}
                         {editingWaypoint === idx ? (
-                          <div style={{ flex: 1, display: "flex", gap: "8px" }}>
+                          <div className="flex-1 flex gap-2">
                             <input
                               value={editValues.name}
                               onChange={(e) =>
@@ -3114,10 +3052,9 @@ export default function App() {
                           </div>
                         ) : (
                           <p
-                            className="font-semibold cursor-pointer hover:bg-yellow-100 px-1 rounded"
+                            className="font-semibold cursor-pointer hover:bg-yellow-100 px-1 rounded flex-1"
                             onClick={() => startEditingWaypoint(idx)}
                             title="Click to edit"
-                            style={{ flex: 1 }}
                           >
                             {wp.name}
                           </p>
@@ -3135,7 +3072,7 @@ export default function App() {
                       </p>
 
                       {editingWaypoint === idx ? (
-                        <div style={{ marginTop: "8px" }}>
+                        <div className="mt-2">
                           <textarea
                             value={editValues.poi}
                             onChange={(e) =>
@@ -3153,49 +3090,31 @@ export default function App() {
                       ) : (
                         wp.poi && (
                           <p
-                            className="text-sm text-gray-600 cursor-pointer hover:bg-yellow-100 px-1 rounded"
+                            className="text-sm text-gray-600 cursor-pointer hover:bg-yellow-100 px-1 rounded mt-1"
                             onClick={() => startEditingWaypoint(idx)}
                             title="Click to edit"
-                            style={{ marginTop: "4px" }}
                           >
                             POI: {wp.poi}
                           </p>
                         )
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  ))
+                )}
+              </div>
+            </section>
           </div>
 
-          {/* RIGHT COLUMN: Stage Summaries */}
-          <div style={{ flex: 1 }}>
-            <h2
-              className="text-lg font-semibold"
-              style={{ marginBottom: "8px" }}
-            >
-              📋 Stage Summaries
-            </h2>
-            <div
-              style={{
-                maxHeight: "40vh",
-                overflowY: "auto",
-                paddingRight: "4px",
-              }}
-            >
-              {stageSummaries.length === 0 ? (
-                <p className="text-gray-500">No stages completed yet.</p>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
-                  }}
-                >
-                  {stageSummaries.map((summary, idx) => (
-                    <div key={idx} className="bg-white shadow rounded p-3">
+          {/* RIGHT COLUMN: Complete Stage Summaries Section */}
+          <div>
+            <section className="mt-6">
+              <h2 className="text-lg font-semibold mb-2">📋 Stage Summaries</h2>
+              <div className="max-h-[40vh] overflow-y-auto pr-1 space-y-2">
+                {stageSummaries.length === 0 ? (
+                  <p className="text-gray-500">No stages completed yet.</p>
+                ) : (
+                  stageSummaries.map((summary, idx) => (
+                    <div key={idx} className="bg-white shadow rounded p-3 mb-2">
                       <h3 className="font-bold text-blue-700">
                         {summary.name}
                       </h3>
@@ -3214,10 +3133,10 @@ export default function App() {
                         <p>POIs: {summary.pois.join(", ")}</p>
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  ))
+                )}
+              </div>
+            </section>
           </div>
         </div>
       </div>

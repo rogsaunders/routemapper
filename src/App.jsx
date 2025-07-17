@@ -2944,6 +2944,7 @@ export default function App() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 marginBottom: "8px",
+                minHeight: "32px",
               }}
             >
               <h2 className="text-lg font-semibold">
@@ -3171,12 +3172,22 @@ export default function App() {
 
           {/* RIGHT COLUMN: Stage Summaries */}
           <div style={{ flex: 1 }}>
-            <h2
-              className="text-lg font-semibold"
-              style={{ marginBottom: "8px" }}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "8px",
+                minHeight: "32px", // ← SAME HEIGHT as left column
+              }}
             >
-              📋 Stage Summaries
-            </h2>
+              <h2 className="text-lg font-semibold">📋 Stage Summaries</h2>
+              {stageSummaries.length > 0 && (
+                <span className="text-sm text-gray-600 bg-gray-200 px-2 py-1 rounded">
+                  {stageSummaries.length} completed
+                </span>
+              )}
+            </div>
             <div
               style={{
                 maxHeight: "40vh",

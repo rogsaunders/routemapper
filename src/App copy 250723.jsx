@@ -356,10 +356,7 @@ const exportFileIPadCompatible = async (
   title = "Rally Mapper Export"
 ) => {
   try {
-    console.log(`🔍 === STARTING EXPORT: ${filename} ===`);
-    console.log(`📄 Content length: ${content.length} characters`);
-    console.log(`📄 MIME type: ${mimeType}`);
-    console.log(`📄 File size: ${new Blob([content]).size} bytes`);
+    console.log(`🔍 Starting iPad-compatible export: ${filename}`);
 
     // Debug environment first
     const env = {
@@ -528,8 +525,6 @@ export default function App() {
   const [mapType, setMapType] = useState("roadmap");
   const [showRouteStats, setShowRouteStats] = useState(false);
   const [mapZoom, setMapZoom] = useState(15);
-  const [isFollowingGPS, setIsFollowingGPS] = useState(true); // Start following GPS
-  const [staticMapCenter, setStaticMapCenter] = useState(null); // Fixed center when not following
 
   useEffect(() => {
     const stored = localStorage.getItem("unsavedWaypoints");
@@ -744,8 +739,6 @@ export default function App() {
     setTrackingPoints([]); // ✅ Reset previous tracking points
     setWaypoints([]); // Optional: also reset waypoints if needed
     setTotalDistance(0);
-    setIsFollowingGPS(true); // Start following GPS for new stage
-    setStaticMapCenter(null); // Clear any previous static center
 
     const geo = navigator.geolocation;
     if (!geo) {
@@ -780,81 +773,12 @@ export default function App() {
     );
   };
 
-  const mapCenter = (() => {
-    // If we're not following GPS and have a static center, use it
-    if (!isFollowingGPS && staticMapCenter) {
-      return staticMapCenter;
-    }
-
-    // Otherwise use normal logic
-    if (waypoints.length > 0) {
-      return { lat: waypoints[0].lat, lng: waypoints[0].lon };
-    }
-
-    if (currentGPS) {
-      return { lat: currentGPS.lat, lng: currentGPS.lon };
-    }
-
-    return { lat: -35.0, lng: 138.75 };
-  })();
-
-  const handleMapDragStart = () => {
-    console.log("🗺️ User dragged map - stopping GPS follow");
-    setIsFollowingGPS(false); // Stop following GPS when user drags map
-  };
-
-  const handleMapDragEnd = () => {
-    // When user finishes dragging, save that position
-    if (currentGPS) {
-      setStaticMapCenter({ lat: currentGPS.lat, lng: currentGPS.lon });
-    }
-  };
-
-  const recenterOnGPS = () => {
-    if (currentGPS) {
-      console.log("🎯 Re-centering on current GPS");
-      setIsFollowingGPS(true); // Resume following GPS
-      setStaticMapCenter(null); // Clear static center
-    }
-  };
-
-  const handleMapZoomChanged = (map) => {
-    // Update zoom state but don't re-center
-    const newZoom = map.getZoom();
-    setMapZoom(newZoom);
-  };
-
-  // 4. RE-CENTER FUNCTIONS:
-  const recenterOnCurrentLocation = () => {
-    if (currentGPS) {
-      console.log("🎯 Re-centering on current GPS location");
-      setStaticMapCenter({ lat: currentGPS.lat, lng: currentGPS.lon });
-      setIsFollowingGPS(true);
-      setUserPannedMap(false);
-    }
-  };
-
-  const recenterOnRoute = () => {
-    if (waypoints.length > 0) {
-      console.log("🎯 Re-centering on route start");
-      setStaticMapCenter({ lat: waypoints[0].lat, lng: waypoints[0].lon });
-      setIsFollowingGPS(false); // Don't auto-follow, just center once
-      setUserPannedMap(false);
-    }
-  };
-
-  const toggleFollowGPS = () => {
-    const newFollowState = !isFollowingGPS;
-    setIsFollowingGPS(newFollowState);
-
-    if (newFollowState && currentGPS) {
-      // When enabling follow mode, center on current location
-      setStaticMapCenter({ lat: currentGPS.lat, lng: currentGPS.lon });
-    }
-
-    setUserPannedMap(false);
-    console.log("🗺️ GPS Follow mode:", newFollowState ? "ON" : "OFF");
-  };
+  const mapCenter =
+    waypoints.length > 0
+      ? { lat: waypoints[0].lat, lng: waypoints[0].lon } // Center on first waypoint
+      : currentGPS
+      ? { lat: currentGPS.lat, lng: currentGPS.lon } // Or current GPS if no waypoints
+      : { lat: -35.0, lng: 138.75 };
 
   const startVoiceInput = () => {
     const SpeechRecognition =
@@ -1548,7 +1472,7 @@ export default function App() {
       );
 
       console.log("Enhanced JSON export result:", result);
-      return result;
+      return result.success;
     } catch (error) {
       console.error("❌ Enhanced JSON export failed:", error);
       throw error;
@@ -1596,7 +1520,7 @@ export default function App() {
       );
 
       console.log("Simple JSON export result:", result);
-      return result;
+      return result.success;
     } catch (error) {
       console.error("❌ Simple JSON export failed:", error);
       throw error;
@@ -1623,7 +1547,7 @@ export default function App() {
       );
 
       console.log("GPX export result:", result);
-      return result;
+      return result.success;
     } catch (error) {
       console.error("❌ GPX export failed:", error);
       throw error;
@@ -1705,14 +1629,14 @@ export default function App() {
 
       // ✅ USE IPAD-COMPATIBLE HELPER (this was missing!)
       const result = await exportFileIPadCompatible(
-        gpxContent,
-        `${name}.gpx`,
+        rallyGPX,
+        `${name}-rally-navigator.gpx`,
         "application/gpx+xml",
-        "Rally Mapper GPX Export"
+        "Rally Navigator GPX Export"
       );
 
       console.log("Rally Navigator GPX export result:", result);
-      return result;
+      return result.success;
     } catch (error) {
       console.error("❌ Rally Navigator GPX export failed:", error);
       throw error;
@@ -1763,7 +1687,7 @@ export default function App() {
       );
 
       console.log("KML export result:", result);
-      return result;
+      return result.success;
     } catch (error) {
       console.error("❌ KML export failed:", error);
       throw error;
@@ -1915,7 +1839,6 @@ export default function App() {
     try {
       setstageStarted(false);
       setUndoTimeLeft(5);
-      setIsFollowingGPS(true); // Resume following GPS after stage ends
 
       const stageNameFormatted = `${todayDate}/Stage ${stageCount}`;
       const currentstage = { name: stageNameFormatted, waypoints };
@@ -1957,38 +1880,34 @@ export default function App() {
       const exportPromises = [
         exportAsJSON(waypoints, trackingPoints, exportName).catch((err) => {
           console.error("JSON export failed:", err);
-          return { success: false, error: err.message };
+          return false;
         }),
         exportAsSimpleJSON(waypoints, trackingPoints, exportName).catch(
           (err) => {
             console.error("Simple JSON export failed:", err);
-            return { success: false, error: err.message };
+            return false;
           }
         ),
         exportAsGPX(waypoints, trackingPoints, exportName).catch((err) => {
           console.error("GPX export failed:", err);
-          return { success: false, error: err.message };
+          return false;
         }),
         exportAsKML(waypoints, trackingPoints, exportName).catch((err) => {
           console.error("KML export failed:", err);
-          return { success: false, error: err.message };
+          return false;
         }),
       ];
 
       // Wait for all exports to complete
       const exportResults = await Promise.allSettled(exportPromises);
 
-      // Count successful exports - FIXED LOGIC
+      // Count successful exports
       let successCount = 0;
       const results = exportResults.map((result, index) => {
         const formatNames = ["Enhanced JSON", "Simple JSON", "GPX", "KML"];
-
-        // ✅ FIXED: Check for object with success property
-        if (result.status === "fulfilled" && result.value?.success === true) {
+        if (result.status === "fulfilled" && result.value === true) {
           successCount++;
-          console.log(
-            `✅ ${formatNames[index]} export successful (method: ${result.value.method})`
-          );
+          console.log(`✅ ${formatNames[index]} export successful`);
           return true;
         } else {
           console.error(
@@ -2337,17 +2256,6 @@ export default function App() {
         </button>
 
         {showReplay && <ReplayRoute waypoints={waypoints} />}
-        <button
-          onClick={recenterOnGPS}
-          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg ${
-            isFollowingGPS
-              ? "bg-blue-500 text-white"
-              : "bg-orange-500 text-white hover:bg-orange-600"
-          }`}
-          title="Re-center map on current GPS location"
-        >
-          📍 {isFollowingGPS ? "Following" : "Re-center"}
-        </button>
       </div>
 
       {showMap && (
@@ -2367,8 +2275,6 @@ export default function App() {
                 center={mapCenter} // ← USE STATIC CENTER
                 zoom={mapZoom}
                 mapTypeId={mapType}
-                onDragStart={handleMapDragStart} // ← ADD THIS
-                onDragEnd={handleMapDragEnd}
                 onZoomChanged={() => {
                   // Update zoom state if needed for other features
                 }}
@@ -2402,9 +2308,9 @@ export default function App() {
                     center={{ lat: currentGPS.lat, lng: currentGPS.lon }}
                     radius={gpsAccuracy}
                     options={{
-                      fillColor: isFollowingGPS ? "#4285F4" : "#FF6B35", // ← Match marker color
+                      fillColor: "#4285F4",
                       fillOpacity: 0.1,
-                      strokeColor: isFollowingGPS ? "#4285F4" : "#FF6B35",
+                      strokeColor: "#4285F4",
                       strokeOpacity: 0.3,
                       strokeWeight: 1,
                     }}
@@ -2425,10 +2331,7 @@ export default function App() {
                     <Marker
                       key={index}
                       position={{ lat: wp.lat, lng: wp.lon }}
-                      onClick={() => {
-                        setSelectedWaypoint(index);
-                        recenterOnGPS();
-                      }}
+                      onClick={() => setSelectedWaypoint(index)}
                       icon={
                         wp.iconSrc
                           ? {
@@ -2438,16 +2341,14 @@ export default function App() {
                             }
                           : {
                               path: google.maps.SymbolPath.CIRCLE,
-                              scale: 10,
-                              fillColor: isFollowingGPS ? "#4285F4" : "#FF6B35",
-                              fillOpacity: 1,
+                              scale: 8,
+                              fillColor: "#FF0000",
+                              fillOpacity: 0.8,
                               strokeColor: "#ffffff",
-                              strokeWeight: 3,
+                              strokeWeight: 2,
                             }
                       }
-                      title={`Current Location ${
-                        isFollowingGPS ? "(Following)" : "(Free)"
-                      }`}
+                      title={`${wp.name} (${wp.timestamp})`}
                       label={{
                         text: (index + 1).toString(),
                         color: "white",
@@ -2662,13 +2563,9 @@ export default function App() {
               a.href = url;
               a.download = fileName;
               a.style.display = "none";
-              if (isIOS) {
-                window.open(url, "_blank");
-              } else {
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-              }
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
               URL.revokeObjectURL(url);
 
               console.log("🔍 Test download triggered - look for:", fileName);
@@ -2787,11 +2684,9 @@ export default function App() {
                 exportAsKML(waypoints, trackingPoints, testName),
               ]);
 
-              // ✅ FIXED: Check for success property in object
               const successCount = results.filter(
-                (r) => r.status === "fulfilled" && r.value?.success === true
+                (r) => r.status === "fulfilled" && r.value === true
               ).length;
-
               const formatNames = [
                 "Enhanced JSON",
                 "Simple JSON",
@@ -2819,99 +2714,6 @@ export default function App() {
           }}
         >
           🧪 Test Main Export Process
-        </button>
-
-        <button
-          className="bg-red-600 text-white px-3 py-2 rounded text-sm hover:bg-red-700"
-          onClick={async () => {
-            if (waypoints.length === 0) {
-              alert("❌ No waypoints to export! Add some waypoints first.");
-              return;
-            }
-
-            console.log("🔍 === ENHANCED EXPORT METHOD ANALYSIS ===");
-
-            try {
-              const testName = routeName || `method-debug-${Date.now()}`;
-
-              // Test each export with method tracking
-              console.log("🔍 Testing Enhanced JSON...");
-              const json1Result = await exportAsJSON(
-                waypoints,
-                trackingPoints,
-                testName
-              );
-              console.log(
-                `📋 Enhanced JSON: success=${json1Result}, method=${
-                  json1Result?.method || "unknown"
-                }, filename=${json1Result?.filename || "unknown"}`
-              );
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-
-              console.log("🔍 Testing Simple JSON...");
-              const json2Result = await exportAsSimpleJSON(
-                waypoints,
-                trackingPoints,
-                testName
-              );
-              console.log(
-                `📋 Simple JSON: success=${json2Result}, method=${
-                  json2Result?.method || "unknown"
-                }, filename=${json2Result?.filename || "unknown"}`
-              );
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-
-              console.log("🔍 Testing GPX...");
-              const gpxResult = await exportAsGPX(
-                waypoints,
-                trackingPoints,
-                testName
-              );
-              console.log(
-                `📋 GPX: success=${gpxResult}, method=${
-                  gpxResult?.method || "unknown"
-                }, filename=${gpxResult?.filename || "unknown"}`
-              );
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-
-              console.log("🔍 Testing KML...");
-              const kmlResult = await exportAsKML(
-                waypoints,
-                trackingPoints,
-                testName
-              );
-              console.log(
-                `📋 KML: success=${kmlResult}, method=${
-                  kmlResult?.method || "unknown"
-                }, filename=${kmlResult?.filename || "unknown"}`
-              );
-
-              // Summary
-              const methods = {
-                "Enhanced JSON": json1Result?.method || "failed",
-                "Simple JSON": json2Result?.method || "failed",
-                GPX: gpxResult?.method || "failed",
-                KML: kmlResult?.method || "failed",
-              };
-
-              console.log("🔍 === EXPORT METHODS SUMMARY ===");
-              console.log("Methods used:", methods);
-
-              // Create detailed alert
-              const summary = Object.entries(methods)
-                .map(([format, method]) => `${format}: ${method}`)
-                .join("\n");
-
-              alert(
-                `Export Methods Analysis:\n\n${summary}\n\nExpected files:\n• ${testName}-enhanced.json\n• ${testName}-simple.json\n• ${testName}.gpx\n• ${testName}.kml\n\nCheck Files app and console logs!`
-              );
-            } catch (error) {
-              console.error("❌ Enhanced debug failed:", error);
-              alert(`❌ Enhanced debug failed: ${error.message}`);
-            }
-          }}
-        >
-          🔍 Enhanced Method Debug
         </button>
       </div>
 

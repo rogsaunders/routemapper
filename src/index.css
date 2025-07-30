@@ -1,9 +1,265 @@
 @import "@fontsource/bebas-neue";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 body {
   font-family: "Bebas Neue", sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Essential Rally Mapper styles */
+.bg-red-600 {
+  background-color: #dc2626 !important;
+}
+
+.bg-blue-600 {
+  background-color: #2563eb !important;
+}
+
+.bg-green-600 {
+  background-color: #16a34a !important;
+}
+
+.bg-gray-400 {
+  background-color: #9ca3af !important;
+}
+
+.bg-brown-600 {
+  background-color: #e98547 !important;
+}
+
+.bg-gray-100 {
+  background-color: #f3f4f6 !important;
+}
+
+.bg-gray-200 {
+  background-color: #e5e7eb !important;
+}
+
+.bg-white {
+  background-color: white !important;
+}
+
+.text-white {
+  color: white !important;
+}
+
+.text-black {
+  color: black !important;
+}
+
+.text-gray-600 {
+  color: #4b5563 !important;
+}
+
+.text-gray-700 {
+  color: #374151 !important;
+}
+
+.px-4 {
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+}
+
+.py-2 {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+.px-3 {
+  padding-left: 0.75rem !important;
+  padding-right: 0.75rem !important;
+}
+
+.p-2 {
+  padding: 0.5rem !important;
+}
+
+.p-3 {
+  padding: 0.75rem !important;
+}
+
+.p-4 {
+  padding: 1rem !important;
+}
+
+.rounded {
+  border-radius: 0.375rem !important;
+}
+
+.rounded-lg {
+  border-radius: 0.5rem !important;
+}
+
+.flex {
+  display: flex !important;
+}
+
+.flex-1 {
+  flex: 1 1 0% !important;
+}
+
+.items-center {
+  align-items: center !important;
+}
+
+.justify-between {
+  justify-content: space-between !important;
+}
+
+.gap-2 {
+  gap: 0.5rem !important;
+}
+
+.gap-4 {
+  gap: 1rem !important;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem !important;
+}
+
+.mb-4 {
+  margin-bottom: 1rem !important;
+}
+
+.mt-2 {
+  margin-top: 0.5rem !important;
+}
+
+.disabled\:bg-gray-400:disabled {
+  background-color: #9ca3af !important;
+}
+
+.disabled\:cursor-not-allowed:disabled {
+  cursor: not-allowed !important;
+}
+
+.hover\:bg-red-700:hover {
+  background-color: #b91c1c !important;
+}
+
+.hover\:bg-blue-700:hover {
+  background-color: #1d4ed8 !important;
+}
+
+.hover\:bg-green-700:hover {
+  background-color: #15803d !important;
+}
+
+.hover\:bg-brown-700:hover {
+  background-color: #bd4206 !important;
+}
+
+button {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input,
+textarea {
+  border: 1px solid #d1d5db;
+  font-family: inherit;
+}
+
+.border {
+  border: 1px solid #d1d5db !important;
+}
+
+.text-lg {
+  font-size: 1.125rem !important;
+}
+
+.font-semibold {
+  font-weight: 600 !important;
+}
+
+.font-bold {
+  font-weight: 700 !important;
+}
+
+.text-sm {
+  font-size: 0.875rem !important;
+}
+
+.text-xs {
+  font-size: 0.75rem !important;
+}
+
+.w-full {
+  width: 100% !important;
+}
+
+.h-screen {
+  height: 100vh !important;
+}
+
+.h-\[200px\] {
+  height: 200px !important;
+}
+
+.h-32 {
+  height: 8rem !important; /* 128px */
+}
+
+.h-64 {
+  height: 16rem !important; /* 256px */
+}
+
+.h-96 {
+  height: 24rem !important; /* 384px */
+}
+
+.relative {
+  position: relative !important;
+}
+
+.absolute {
+  position: absolute !important;
+}
+
+.fixed {
+  position: fixed !important;
+}
+
+.z-50 {
+  z-index: 50 !important;
+}
+
+.shadow-lg {
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite !important;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 1s infinite !important;
+}
+
+.google-map-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: none;
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
 }

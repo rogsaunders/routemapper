@@ -738,15 +738,6 @@ export default function App() {
   };
 
   const handleStartstage = () => {
-    console.log("🔍 === HANDLESTARTSTAGE START ===");
-    console.log("🔍 Browser environment check:");
-    console.log("- User Agent:", navigator.userAgent);
-    console.log("- Platform:", navigator.platform);
-    console.log(
-      "- Date creation test:",
-      new Date().toISOString().split("T")[0]
-    );
-    console.log("- Template literal test:", `Test ${1} ${2}`);
     setstageLoading(true);
     setstageStarted(true);
     setIsTracking(true); // ✅ Start tracking immediately
@@ -755,8 +746,6 @@ export default function App() {
     setTotalDistance(0);
     setIsFollowingGPS(true); // Start following GPS for new stage
     setStaticMapCenter(null); // Clear any previous static center
-
-    console.log("🔍 State updates completed");
 
     const geo = navigator.geolocation;
     if (!geo) {
@@ -767,17 +756,13 @@ export default function App() {
       return;
     }
 
-    console.log("🔍 Geolocation available, calling getCurrentPosition...");
-
     geo.getCurrentPosition(
       (pos) => {
-        console.log("🔍 GPS SUCCESS callback triggered");
         const { latitude, longitude } = pos.coords;
         const newGPS = { lat: latitude, lon: longitude };
         setStartGPS(newGPS);
         setCurrentGPS(newGPS);
 
-        console.log("🔍 About to create stage name...");
         const stageName = `${todayDate}/Stage ${stageCount}`;
         console.log("🔍 Debug stage creation:");
         console.log("- todayDate:", todayDate);
@@ -795,10 +780,8 @@ export default function App() {
         setGpsError("Failed to get starting GPS position. Please try again.");
         setstageLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
-
-    console.log("🔍 getCurrentPosition called, waiting for callback...");
   };
 
   const mapCenter = (() => {
@@ -2128,7 +2111,6 @@ export default function App() {
             </button>
             <button
               onClick={() => {
-                console.log("🔍 Main button clicked!");
                 setShowStartstageConfirm(false);
                 handleStartstage();
               }}

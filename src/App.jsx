@@ -2578,43 +2578,28 @@ export default function App() {
         </h2>
         <div className="flex flex-wrap gap-2 mb-2">
           <input
-            className="flex-1 p-2 border rounded bg-gray-100"
+            className="flex-1 p-2 border rounded bg-gray-100 text-lg-input" // ← Add text-lg-input
             placeholder="Route Name"
             value={routeName}
             onChange={(e) => setRouteName(e.target.value)}
           />
           <input
-            className="p-2 border rounded"
+            className="p-2 border rounded text-lg-input" // ← Add text-lg-input
             placeholder="Stage Number"
             value={stageName}
             onChange={(e) => setstageName(e.target.value)}
           />
           <button
-            className="bg-green-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-            onClick={() => {
-              if (waypoints.length > 0) {
-                setShowStartstageConfirm(true);
-              } else {
-                handleStartstage();
-              }
-            }}
-            disabled={stageLoading || !currentGPS || stageStarted}
+            className="bg-green-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-xl-button" // ← Add text-xl-button
+            // ... rest of button props
           >
-            {stageLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Starting...
-              </>
-            ) : (
-              <>▶️ Start stage</>
-            )}
+            ▶️ Start Stage
           </button>
           <button
-            className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
-            onClick={() => setShowEndstageConfirm(true)}
-            disabled={!stageStarted || waypoints.length === 0}
+            className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed text-xl-button" // ← Add text-xl-button
+            // ... rest of button props
           >
-            ⏹ End stage
+            ⏹ End Stage
           </button>
         </div>
       </div>

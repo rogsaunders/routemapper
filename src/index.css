@@ -55,6 +55,27 @@ body {
   color: #374151 !important;
 }
 
+.text-lg-input {
+  font-size: 1rem !important; /* 20px */
+}
+
+.text-xl-input {
+  font-size: 1.25rem !important; /* 24px */
+}
+
+/* Larger buttons for Start/End Stage */
+.text-lg-button {
+  font-size: 1.125rem !important; /* 18px */
+}
+
+.text-xl-button {
+  font-size: 1rem !important; /* 20px */
+}
+
+.text-2xl-button {
+  font-size: 1.25rem !important; /* 24px */
+}
+
 .px-4 {
   padding-left: 1rem !important;
   padding-right: 1rem !important;

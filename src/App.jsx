@@ -389,11 +389,23 @@ const exportFileIPadCompatible = async (
         const file = new File([blob], filename, { type: mimeType });
         console.log(`📤 Attempting share sheet: ${file.name}`);
 
+        const sharePromise = navigator.share({
+          files: [file],
+          title: title,
+          text: `Rally route export: ${filename}`,
+        });
+
         await navigator.share({
           files: [file],
           title: title,
           text: `Rally route export: ${filename}`,
         });
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Share timeout")), 5000)
+        );
+
+        await Promise.race([sharePromise, timeoutPromise]);
 
         console.log("✅ Share sheet successful");
         return { success: true, method: "share_sheet" };
@@ -605,7 +617,7 @@ export default function App() {
     const options = {
       enableHighAccuracy: true,
       timeout: 15000,
-      maximumAge: 10000,
+      maximumAge: 60000,
     };
 
     // Get initial position
@@ -674,7 +686,7 @@ export default function App() {
             console.log("📍 Auto-tracked:", newPoint);
           },
           (err) => console.error("❌ GPS error", err),
-          { enableHighAccuracy: true, timeout: 10000 }
+          { enableHighAccuracy: true, timeout: 15000 }
         );
       }
     }, 20000);
@@ -738,15 +750,6 @@ export default function App() {
   };
 
   const handleStartstage = () => {
-    console.log("🔍 === HANDLESTARTSTAGE START ===");
-    console.log("🔍 Browser environment check:");
-    console.log("- User Agent:", navigator.userAgent);
-    console.log("- Platform:", navigator.platform);
-    console.log(
-      "- Date creation test:",
-      new Date().toISOString().split("T")[0]
-    );
-    console.log("- Template literal test:", `Test ${1} ${2}`);
     setstageLoading(true);
     setstageStarted(true);
     setIsTracking(true); // ✅ Start tracking immediately
@@ -755,8 +758,6 @@ export default function App() {
     setTotalDistance(0);
     setIsFollowingGPS(true); // Start following GPS for new stage
     setStaticMapCenter(null); // Clear any previous static center
-
-    console.log("🔍 State updates completed");
 
     const geo = navigator.geolocation;
     if (!geo) {
@@ -767,17 +768,13 @@ export default function App() {
       return;
     }
 
-    console.log("🔍 Geolocation available, calling getCurrentPosition...");
-
     geo.getCurrentPosition(
       (pos) => {
-        console.log("🔍 GPS SUCCESS callback triggered");
         const { latitude, longitude } = pos.coords;
         const newGPS = { lat: latitude, lon: longitude };
         setStartGPS(newGPS);
         setCurrentGPS(newGPS);
 
-        console.log("🔍 About to create stage name...");
         const stageName = `${todayDate}/Stage ${stageCount}`;
         console.log("🔍 Debug stage creation:");
         console.log("- todayDate:", todayDate);
@@ -795,10 +792,8 @@ export default function App() {
         setGpsError("Failed to get starting GPS position. Please try again.");
         setstageLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 6000 }
     );
-
-    console.log("🔍 getCurrentPosition called, waiting for callback...");
   };
 
   const mapCenter = (() => {
@@ -1997,28 +1992,38 @@ export default function App() {
       ];
 
       // Wait for all exports to complete
-      const exportResults = await Promise.allSettled(exportPromises);
+      const exportResults = [];
 
-      // Count successful exports - FIXED LOGIC
-      let successCount = 0;
-      const results = exportResults.map((result, index) => {
-        const formatNames = ["Enhanced JSON", "Simple JSON", "GPX", "KML"];
+      try {
+        console.log("📤 Starting sequential exports...");
 
-        // ✅ FIXED: Check for object with success property
-        if (result.status === "fulfilled" && result.value?.success === true) {
-          successCount++;
-          console.log(
-            `✅ ${formatNames[index]} export successful (method: ${result.value.method})`
-          );
-          return true;
-        } else {
-          console.error(
-            `❌ ${formatNames[index]} export failed:`,
-            result.reason || result.value
-          );
-          return false;
-        }
-      });
+        // Export 1: Enhanced JSON
+        const json1 = await exportAsJSON(waypoints, trackingPoints, exportName);
+        exportResults.push(json1);
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // 2 second delay
+
+        // Export 2: Simple JSON
+        const json2 = await exportAsSimpleJSON(
+          waypoints,
+          trackingPoints,
+          exportName
+        );
+        exportResults.push(json2);
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // 2 second delay
+
+        // Export 3: GPX
+        const gpx = await exportAsGPX(waypoints, trackingPoints, exportName);
+        exportResults.push(gpx);
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // 2 second delay
+
+        // Export 4: KML
+        const kml = await exportAsKML(waypoints, trackingPoints, exportName);
+        exportResults.push(kml);
+
+        console.log("📤 All sequential exports completed");
+      } catch (error) {
+        console.error("❌ Sequential export failed:", error);
+      }
 
       console.log("🔍 Export results:", results);
       console.log("🔍 === MAIN EXPORT PROCESS END ===");
@@ -2128,7 +2133,6 @@ export default function App() {
             </button>
             <button
               onClick={() => {
-                console.log("🔍 Main button clicked!");
                 setShowStartstageConfirm(false);
                 handleStartstage();
               }}
@@ -2614,322 +2618,7 @@ export default function App() {
           </button>
         </div>
       </div>
-      <div className="flex gap-2 mt-2 p-2 bg-gray-100 rounded flex-wrap">
-        <button
-          className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700"
-          onClick={async () => {
-            console.log("🔍 Share capabilities test:");
-            console.log("- navigator.canShare:", !!navigator.canShare);
-            console.log("- navigator.share:", !!navigator.share);
-            console.log("- PWA mode:", !!window.navigator.standalone);
-            console.log("- User agent:", navigator.userAgent);
 
-            if (navigator.canShare) {
-              const testFile = new File(["test content"], "test.txt", {
-                type: "text/plain",
-              });
-              console.log(
-                "- Can share files:",
-                navigator.canShare({ files: [testFile] })
-              );
-              console.log(
-                "- Can share text:",
-                navigator.canShare({ text: "test" })
-              );
-            }
-
-            const results = {
-              hasShare: !!navigator.share,
-              hasCanShare: !!navigator.canShare,
-              isPWA: !!window.navigator.standalone,
-              canShareFiles: navigator.canShare
-                ? navigator.canShare({ files: [new File([""], "test.txt")] })
-                : false,
-            };
-
-            alert(`Share API Test:\n${JSON.stringify(results, null, 2)}`);
-          }}
-        >
-          🧪 Test Share API
-        </button>
-        <button
-          className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700"
-          onClick={async () => {
-            try {
-              const testData = JSON.stringify(
-                {
-                  test: "file location test",
-                  time: new Date().toISOString(),
-                  waypoints: waypoints.length,
-                  device: navigator.userAgent.includes("iPad")
-                    ? "iPad"
-                    : "other",
-                },
-                null,
-                2
-              );
-
-              const blob = new Blob([testData], { type: "application/json" });
-              const fileName = "FIND-ME-test.json";
-
-              // Force download method
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = fileName;
-              a.style.display = "none";
-              if (isIOS) {
-                window.open(url, "_blank");
-              } else {
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-              }
-              URL.revokeObjectURL(url);
-
-              console.log("🔍 Test download triggered - look for:", fileName);
-
-              alert(
-                `Test file '${fileName}' downloaded!\n\nLook for it in:\n• Files app → Downloads\n• Files app → On My iPad\n• Safari downloads (⬇️ icon)\n• Check browser downloads`
-              );
-            } catch (error) {
-              console.error("❌ Test download failed:", error);
-              alert(`❌ Test download failed: ${error.message}`);
-            }
-          }}
-        >
-          📁 Test Download
-        </button>
-        <button
-          className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700"
-          onClick={async () => {
-            try {
-              const testData = JSON.stringify(
-                {
-                  rally: "test share",
-                  time: new Date().toISOString(),
-                  waypoints: waypoints.length,
-                },
-                null,
-                2
-              );
-
-              const blob = new Blob([testData], { type: "application/json" });
-              const file = new File([blob], "rally-share-test.json", {
-                type: "application/json",
-              });
-
-              if (!navigator.share) {
-                throw new Error("navigator.share not available");
-              }
-
-              await navigator.share({
-                files: [file],
-                title: "Rally Mapper Share Test",
-                text: "Testing iOS share functionality",
-              });
-
-              console.log("✅ Share test successful!");
-              alert("✅ Share Sheet worked!");
-            } catch (err) {
-              console.error("❌ Share failed:", err.name, err.message);
-              alert(
-                `❌ Share failed: ${err.message}\n\nThis might be because:\n• Not in PWA mode\n• Browser doesn't support file sharing\n• No share targets available`
-              );
-            }
-          }}
-        >
-          📤 Test Share Sheet
-        </button>
-        <button
-          className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700"
-          onClick={async () => {
-            if (waypoints.length === 0) {
-              alert("❌ No waypoints to export! Add some waypoints first.");
-              return;
-            }
-
-            try {
-              setGpsError("🧪 Testing export with current waypoints...");
-
-              const testName = `test-export-${Date.now()}`;
-              const results = await Promise.allSettled([
-                exportAsJSON(waypoints, trackingPoints, testName),
-                exportAsGPX(waypoints, trackingPoints, testName),
-              ]);
-
-              const successCount = results.filter(
-                (r) => r.status === "fulfilled"
-              ).length;
-
-              setGpsError(
-                `🧪 Test complete: ${successCount}/2 exports succeeded`
-              );
-              setTimeout(() => setGpsError(null), 3000);
-
-              console.log("🧪 Export test results:", results);
-              alert(
-                `Export test complete!\n${successCount}/2 formats exported successfully.\nCheck console for details.`
-              );
-            } catch (error) {
-              console.error("❌ Export test failed:", error);
-              setGpsError("❌ Export test failed");
-              setTimeout(() => setGpsError(null), 3000);
-            }
-          }}
-        >
-          🧪 Test Export
-        </button>
-        <button
-          className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700"
-          onClick={async () => {
-            if (waypoints.length === 0) {
-              alert("❌ No waypoints to export! Add some waypoints first.");
-              return;
-            }
-
-            console.log("🔍 === TESTING MAIN EXPORT PROCESS ===");
-
-            try {
-              setGpsError("🧪 Testing main export process...");
-
-              const testName = routeName || `main-export-test-${Date.now()}`;
-
-              // Test the exact same process as End Stage
-              const results = await Promise.allSettled([
-                exportAsJSON(waypoints, trackingPoints, testName),
-                exportAsSimpleJSON(waypoints, trackingPoints, testName),
-                exportAsGPX(waypoints, trackingPoints, testName),
-                exportAsKML(waypoints, trackingPoints, testName),
-              ]);
-
-              // ✅ FIXED: Check for success property in object
-              const successCount = results.filter(
-                (r) => r.status === "fulfilled" && r.value?.success === true
-              ).length;
-
-              const formatNames = [
-                "Enhanced JSON",
-                "Simple JSON",
-                "GPX",
-                "KML",
-              ];
-
-              results.forEach((result, index) => {
-                console.log(`${formatNames[index]}:`, result);
-              });
-
-              setGpsError(
-                `🧪 Main process test: ${successCount}/4 exports succeeded`
-              );
-              setTimeout(() => setGpsError(null), 5000);
-
-              alert(
-                `Main Export Process Test:\n\n${successCount}/4 formats exported successfully.\n\nCheck console for detailed results.`
-              );
-            } catch (error) {
-              console.error("❌ Main export test failed:", error);
-              setGpsError("❌ Main export test failed");
-              setTimeout(() => setGpsError(null), 3000);
-            }
-          }}
-        >
-          🧪 Test Main Export Process
-        </button>
-
-        <button
-          className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700"
-          onClick={async () => {
-            if (waypoints.length === 0) {
-              alert("❌ No waypoints to export! Add some waypoints first.");
-              return;
-            }
-
-            console.log("🔍 === ENHANCED EXPORT METHOD ANALYSIS ===");
-
-            try {
-              const testName = routeName || `method-debug-${Date.now()}`;
-
-              // Test each export with method tracking
-              console.log("🔍 Testing Enhanced JSON...");
-              const json1Result = await exportAsJSON(
-                waypoints,
-                trackingPoints,
-                testName
-              );
-              console.log(
-                `📋 Enhanced JSON: success=${json1Result}, method=${
-                  json1Result?.method || "unknown"
-                }, filename=${json1Result?.filename || "unknown"}`
-              );
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-
-              console.log("🔍 Testing Simple JSON...");
-              const json2Result = await exportAsSimpleJSON(
-                waypoints,
-                trackingPoints,
-                testName
-              );
-              console.log(
-                `📋 Simple JSON: success=${json2Result}, method=${
-                  json2Result?.method || "unknown"
-                }, filename=${json2Result?.filename || "unknown"}`
-              );
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-
-              console.log("🔍 Testing GPX...");
-              const gpxResult = await exportAsGPX(
-                waypoints,
-                trackingPoints,
-                testName
-              );
-              console.log(
-                `📋 GPX: success=${gpxResult}, method=${
-                  gpxResult?.method || "unknown"
-                }, filename=${gpxResult?.filename || "unknown"}`
-              );
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-
-              console.log("🔍 Testing KML...");
-              const kmlResult = await exportAsKML(
-                waypoints,
-                trackingPoints,
-                testName
-              );
-              console.log(
-                `📋 KML: success=${kmlResult}, method=${
-                  kmlResult?.method || "unknown"
-                }, filename=${kmlResult?.filename || "unknown"}`
-              );
-
-              // Summary
-              const methods = {
-                "Enhanced JSON": json1Result?.method || "failed",
-                "Simple JSON": json2Result?.method || "failed",
-                GPX: gpxResult?.method || "failed",
-                KML: kmlResult?.method || "failed",
-              };
-
-              console.log("🔍 === EXPORT METHODS SUMMARY ===");
-              console.log("Methods used:", methods);
-
-              // Create detailed alert
-              const summary = Object.entries(methods)
-                .map(([format, method]) => `${format}: ${method}`)
-                .join("\n");
-
-              alert(
-                `Export Methods Analysis:\n\n${summary}\n\nExpected files:\n• ${testName}-enhanced.json\n• ${testName}-simple.json\n• ${testName}.gpx\n• ${testName}.kml\n\nCheck Files app and console logs!`
-              );
-            } catch (error) {
-              console.error("❌ Enhanced debug failed:", error);
-              alert(`❌ Enhanced debug failed: ${error.message}`);
-            }
-          }}
-        >
-          🔍 Enhanced Method Debug
-        </button>
-      </div>
       {/* Voice Instructions - Collapsible */}
       {/* Waypoint Entry */}
       <div>

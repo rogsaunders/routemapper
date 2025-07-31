@@ -389,11 +389,23 @@ const exportFileIPadCompatible = async (
         const file = new File([blob], filename, { type: mimeType });
         console.log(`📤 Attempting share sheet: ${file.name}`);
 
+        const sharePromise = navigator.share({
+          files: [file],
+          title: title,
+          text: `Rally route export: ${filename}`,
+        });
+
         await navigator.share({
           files: [file],
           title: title,
           text: `Rally route export: ${filename}`,
         });
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Share timeout")), 5000)
+        );
+
+        await Promise.race([sharePromise, timeoutPromise]);
 
         console.log("✅ Share sheet successful");
         return { success: true, method: "share_sheet" };
@@ -605,7 +617,7 @@ export default function App() {
     const options = {
       enableHighAccuracy: true,
       timeout: 15000,
-      maximumAge: 10000,
+      maximumAge: 60000,
     };
 
     // Get initial position
@@ -674,7 +686,7 @@ export default function App() {
             console.log("📍 Auto-tracked:", newPoint);
           },
           (err) => console.error("❌ GPS error", err),
-          { enableHighAccuracy: true, timeout: 10000 }
+          { enableHighAccuracy: true, timeout: 15000 }
         );
       }
     }, 20000);
@@ -780,7 +792,7 @@ export default function App() {
         setGpsError("Failed to get starting GPS position. Please try again.");
         setstageLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 6000 }
     );
   };
 

@@ -1502,6 +1502,7 @@ export default function App() {
       const data = {
         metadata: {
           routeName: routeName || name,
+          stageName: stageName,
           exportDate: new Date().toISOString(),
           appVersion: "RallyMapper-Voice-v2.0",
           totalWaypoints: waypointsData.length,
@@ -2578,13 +2579,13 @@ export default function App() {
         </h2>
         <div className="flex flex-wrap gap-2 mb-2">
           <input
-            className="flex-1 p-2 border rounded bg-gray-100 text-lg-input" // ← Add text-lg-input
+            className="flex-1 p-2 border rounded text-black bg-gray-100 text-lg-input" // ← Add text-lg-input
             placeholder="Route Name"
             value={routeName}
             onChange={(e) => setRouteName(e.target.value)}
           />
           <input
-            className="p-2 border rounded text-lg-input" // ← Add text-lg-input
+            className="p-2 border rounded bg-gray-100 text-lg-input" // ← Add text-lg-input
             placeholder="Stage Number"
             value={stageName}
             onChange={(e) => setstageName(e.target.value)}

@@ -76,6 +76,18 @@ body {
   font-size: 1.25rem !important; /* 24px */
 }
 
+.text-black {
+  color: black !important;
+}
+
+.text-gray-800 {
+  color: #1f2937 !important;
+}
+
+.text-gray-900 {
+  color: #111827 !important;
+}
+
 .px-4 {
   padding-left: 1rem !important;
   padding-right: 1rem !important;

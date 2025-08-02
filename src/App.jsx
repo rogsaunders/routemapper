@@ -2641,7 +2641,7 @@ export default function App() {
         </h2>
         <div className="flex flex-wrap gap-2 mb-2">
           {/* New Day Selector */}
-          <div className="flex flex-col">
+          <div className="flex flex-col justify-end">
             <div className="flex items-center gap-3">
               <span className="px-3 py-2 bg-blue-100 border rounded text-center font-bold min-w-16">
                 Day {currentDay}
@@ -2657,9 +2657,9 @@ export default function App() {
           </div>
 
           {/* New Route Button */}
-          <div className="flex flex-col">
+          <div className="flex flex-col justify-end">
             <button
-              className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700"
+              className="bg-brown-600 text-white px-3 py-2 rounded hover:bg-green-700"
               onClick={handleNewRoute}
               title="Start new route"
             >
@@ -2688,13 +2688,33 @@ export default function App() {
           </div>
 
           {/* Stage Buttons */}
-          <div className="flex flex-col">
+          <div className="flex flex-col justify-end gap-1">
             <button
-              className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700"
-              onClick={handleNewRoute}
-              title="Start new route"
+              className="bg-green-600 text-white px-4 py-1 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-lg-button"
+              onClick={() => {
+                if (waypoints.length > 0) {
+                  setShowStartstageConfirm(true);
+                } else {
+                  handleStartstage();
+                }
+              }}
+              disabled={stageLoading || !currentGPS || stageStarted}
             >
-              🗺️ New Route
+              {stageLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Starting...
+                </>
+              ) : (
+                <>▶️ Start Stage</>
+              )}
+            </button>
+            <button
+              className="bg-red-600 text-white px-4 py-1 rounded disabled:bg-gray-400 disabled:cursor-not-allowed text-lg-button"
+              onClick={() => setShowEndstageConfirm(true)}
+              disabled={!stageStarted || waypoints.length === 0}
+            >
+              ⏹ End Stage
             </button>
           </div>
         </div>

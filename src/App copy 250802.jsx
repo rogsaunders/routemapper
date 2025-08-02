@@ -522,9 +522,6 @@ export default function App() {
   const [selectedWaypoint, setSelectedWaypoint] = useState(null);
   const [showEndstageConfirm, setShowEndstageConfirm] = useState(false);
   const [showStartstageConfirm, setShowStartstageConfirm] = useState(false);
-  const [currentDay, setCurrentDay] = useState(1);
-  const [dayRoutes, setDayRoutes] = useState([]); // Track routes per day
-  const [currentRoute, setCurrentRoute] = useState(1); // Route number within current day
   // Add these new state variables for inline editing
   const [editingWaypoint, setEditingWaypoint] = useState(null); // Index of waypoint being edited
   const [editValues, setEditValues] = useState({ name: "", poi: "" }); // Temporary edit values
@@ -713,64 +710,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, [showUndo]);
 
-  const handleNewDay = () => {
-    // Show confirmation if there's existing data
-    if (waypoints.length > 0 || routeName.trim() !== "") {
-      const confirmNewDay = window.confirm(
-        `Start Day ${
-          currentDay + 1
-        }? This will clear all current day data (routes, stages, waypoints). Make sure you've exported your current data first.`
-      );
-
-      if (!confirmNewDay) return;
-    }
-
-    // Clear all data and increment day
-    setCurrentDay((prev) => prev + 1);
-    setCurrentRoute(1);
-    setRouteName("");
-    setWaypoints([]);
-    setTrackingPoints([]);
-    setstage([]);
-    setstageSummaries([]);
-    setstageCount(1);
-    setstageStarted(false);
-    setIsTracking(false);
-    setTotalDistance(0);
-
-    // Clear localStorage
-    localStorage.removeItem("unsavedWaypoints");
-
-    console.log(`📅 Started Day ${currentDay + 1}`);
-  };
-
-  // ← ADD handleNewRoute as a SEPARATE function (outside handleNewDay)
-  const handleNewRoute = () => {
-    // Show confirmation if there's existing route data
-    if (waypoints.length > 0 || routeName.trim() !== "") {
-      const confirmNewRoute = window.confirm(
-        `Start new route? This will clear current route data (stages, waypoints). Make sure you've exported your current route first.`
-      );
-
-      if (!confirmNewRoute) return;
-    }
-
-    // Clear route-specific data but keep day
-    setCurrentRoute((prev) => prev + 1);
-    setRouteName("");
-    setWaypoints([]);
-    setTrackingPoints([]);
-    setstageCount(1); // ← FIXED: lowercase 's'
-    setstageStarted(false); // ← FIXED: lowercase 's'
-    setIsTracking(false);
-    setTotalDistance(0);
-
-    // Clear localStorage
-    localStorage.removeItem("unsavedWaypoints");
-
-    console.log(`🗺️ Started Route ${currentRoute + 1} for Day ${currentDay}`);
-  };
-
   const handleAddWaypoint = () => {
     if (!currentGPS) {
       setGpsError("No GPS signal available. Please wait for GPS to be ready.");
@@ -836,7 +775,7 @@ export default function App() {
         setStartGPS(newGPS);
         setCurrentGPS(newGPS);
 
-        const stageName = `Day${currentDay}/Route${currentRoute}/Stage${stageCount}`;
+        const stageName = `${todayDate}/Stage ${stageCount}`;
         console.log("🔍 Debug stage creation:");
         console.log("- todayDate:", todayDate);
         console.log("- stageCount:", stageCount);
@@ -2404,7 +2343,7 @@ export default function App() {
       <GPSStatus />
       <div className="flex gap-4 mb-4">
         <button
-          className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700"
+          className="px-4 py-2 bg-brown-600 border-black border radius 8px text-white rounded hover:bg-brown-700"
           onClick={() => setShowMap((prev) => !prev)}
         >
           {showMap ? "Hide Map" : "Show Map"}
@@ -2637,66 +2576,33 @@ export default function App() {
       {/* Route Info */}
       <div>
         <h2 className="text-lg font-semibold mb-2">
-          📝 Survey Trip: Day {currentDay} - {todayDate}
+          📝 Route Info: {todayDate}
         </h2>
         <div className="flex flex-wrap gap-2 mb-2">
-          {/* New Day Selector */}
-          <div className="flex flex-col">
-            <div className="flex items-center gap-3">
-              <span className="px-3 py-2 bg-blue-100 border rounded text-center font-bold min-w-16">
-                Day {currentDay}
-              </span>
-              <button
-                className="bg-blue-600 text-white px-2 py-2 rounded text-sm hover:bg-blue-700"
-                onClick={handleNewDay}
-                title="Start new day"
-              >
-                📅 New Day
-              </button>
-            </div>
-          </div>
-
-          {/* New Route Button */}
-          <div className="flex flex-col">
-            <button
-              className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700"
-              onClick={handleNewRoute}
-              title="Start new route"
-            >
-              🗺️ New Route
-            </button>
-          </div>
-
-          {/* Route Name Input */}
-          <div className="flex flex-col flex-1">
-            <input
-              className="flex-1 p-2 border rounded text-black bg-gray-100 text-lg-input"
-              placeholder={`Day ${currentDay} - Route ${currentRoute}`}
-              value={routeName}
-              onChange={(e) => setRouteName(e.target.value)}
-            />
-          </div>
-
-          {/* Stage Input */}
-          <div className="flex flex-col">
-            <input
-              className="p-2 border rounded text-lg-input min-w-32"
-              placeholder="Stage Number"
-              value={stageName}
-              onChange={(e) => setStageName(e.target.value)}
-            />
-          </div>
-
-          {/* Stage Buttons */}
-          <div className="flex flex-col">
-            <button
-              className="bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700"
-              onClick={handleNewRoute}
-              title="Start new route"
-            >
-              🗺️ New Route
-            </button>
-          </div>
+          <input
+            className="flex-1 p-2 border rounded text-black bg-gray-100 text-lg-input" // ← Add text-lg-input
+            placeholder="Route Name"
+            value={routeName}
+            onChange={(e) => setRouteName(e.target.value)}
+          />
+          <input
+            className="p-2 border rounded bg-gray-100 text-lg-input" // ← Add text-lg-input
+            placeholder="Stage Number"
+            value={stageName}
+            onChange={(e) => setstageName(e.target.value)}
+          />
+          <button
+            className="bg-green-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-xl-button" // ← Add text-xl-button
+            // ... rest of button props
+          >
+            ▶️ Start Stage
+          </button>
+          <button
+            className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed text-xl-button" // ← Add text-xl-button
+            // ... rest of button props
+          >
+            ⏹ End Stage
+          </button>
         </div>
       </div>
 

@@ -2404,20 +2404,20 @@ export default function App() {
       <GPSStatus />
       <div className="flex gap-4 mb-4">
         <button
-          className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700"
+          className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700 text-sm"
           onClick={() => setShowMap((prev) => !prev)}
         >
           {showMap ? "Hide Map" : "Show Map"}
         </button>
         <button
-          className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700"
+          className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700 text-sm"
           onClick={() => setFullScreenMap((prev) => !prev)}
         >
           {fullScreenMap ? "Exit Full Screen" : "Full Screen Map"}
         </button>
         <button
           onClick={() => setShowReplay((prev) => !prev)}
-          className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700"
+          className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700 text-sm"
         >
           {showReplay ? "Hide" : "Show"} Route Replay
         </button>
@@ -2659,7 +2659,7 @@ export default function App() {
           {/* New Route Button */}
           <div className="flex flex-col justify-end">
             <button
-              className="bg-brown-600 text-white px-3 py-2 rounded hover:bg-green-700"
+              className="bg-brown-600 text-white px-3 py-2 rounded hover:bg-green-700 text-sm"
               onClick={handleNewRoute}
               title="Start new route"
             >
@@ -2670,7 +2670,7 @@ export default function App() {
           {/* Route Name Input */}
           <div className="flex flex-col flex-1">
             <input
-              className="flex-1 p-2 border rounded text-black bg-gray-100 text-lg-input"
+              className="flex-1 p-2 border rounded text-black bg-gray-100 text-sm"
               placeholder={`Day ${currentDay} - Route ${currentRoute}`}
               value={routeName}
               onChange={(e) => setRouteName(e.target.value)}
@@ -2680,7 +2680,7 @@ export default function App() {
           {/* Stage Input */}
           <div className="flex flex-col">
             <input
-              className="p-2 border rounded text-lg-input min-w-32"
+              className="p-2 border rounded2 text-sm"
               placeholder="Stage Number"
               value={stageName}
               onChange={(e) => setStageName(e.target.value)}
@@ -2690,7 +2690,7 @@ export default function App() {
           {/* Stage Buttons */}
           <div className="flex flex-col justify-end gap-1">
             <button
-              className="bg-green-600 text-white px-4 py-1 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-lg-button"
+              className="bg-green-600 text-white px-4 py-1 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
               onClick={() => {
                 if (waypoints.length > 0) {
                   setShowStartstageConfirm(true);
@@ -2710,7 +2710,7 @@ export default function App() {
               )}
             </button>
             <button
-              className="bg-red-600 text-white px-4 py-1 rounded disabled:bg-gray-400 disabled:cursor-not-allowed text-lg-button"
+              className="bg-red-600 text-white px-4 py-1 rounded disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
               onClick={() => setShowEndstageConfirm(true)}
               disabled={!stageStarted || waypoints.length === 0}
             >

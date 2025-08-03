@@ -2692,7 +2692,7 @@ export default function App() {
             {!stageStarted ? (
               // Start Stage Button (Green)
               <button
-                className="bg-green-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-lg-button"
+                className="bg-green-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
                 onClick={() => {
                   if (waypoints.length > 0) {
                     setShowStartstageConfirm(true);
@@ -2714,7 +2714,8 @@ export default function App() {
             ) : (
               // End Stage Button (Red)
               <button
-                className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-red-600 disabled:cursor-not-allowed text-lg-button"
+                className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-red-600 disabled:cursor-not-allowed text-sm
+                "
                 onClick={() => setShowEndstageConfirm(true)}
                 disabled={waypoints.length === 0}
               >

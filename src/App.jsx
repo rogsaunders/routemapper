@@ -2824,7 +2824,7 @@ export default function App() {
             ) : stageStarted ? (
               <>🎤 Add Location</>
             ) : (
-              <>🎤 Voice Commands</>
+              <>🎤 Add Location</>
             )}
           </button>
           <button

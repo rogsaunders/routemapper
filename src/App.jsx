@@ -545,6 +545,8 @@ export default function App() {
   const [mapZoom, setMapZoom] = useState(15);
   const [isFollowingGPS, setIsFollowingGPS] = useState(true); // Start following GPS
   const [staticMapCenter, setStaticMapCenter] = useState(null); // Fixed center when not following
+  const [userHasInteractedWithMap, setUserHasInteractedWithMap] =
+    useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("unsavedWaypoints");
@@ -584,13 +586,13 @@ export default function App() {
         "Accuracy:",
         Math.round(accuracy) + "m"
       );
+      // DO NOT force map updates here - let the map component handle it
     };
 
     const handleError = (err) => {
       console.error("❌ GPS error", err);
       setGpsLoading(false);
 
-      // More detailed error messages
       switch (err.code) {
         case err.PERMISSION_DENIED:
           setGpsError(
@@ -604,7 +606,6 @@ export default function App() {
           break;
         case err.TIMEOUT:
           setGpsError("GPS timeout. Trying again...");
-          // Retry after timeout
           setTimeout(() => {
             setGpsLoading(true);
             setGpsError(null);
@@ -623,10 +624,7 @@ export default function App() {
       maximumAge: 60000,
     };
 
-    // Get initial position
     geo.getCurrentPosition(handleSuccess, handleError, options);
-
-    // Start watching position
     const watchId = geo.watchPosition(handleSuccess, handleError, options);
 
     return () => {
@@ -818,7 +816,7 @@ export default function App() {
     setWaypoints([]); // Optional: also reset waypoints if needed
     setTotalDistance(0);
     setIsFollowingGPS(true); // Start following GPS for new stage
-    setStaticMapCenter(null); // Clear any previous static center
+    setUserHasInteractedWithMap(false); // Reset interaction flag
 
     const geo = navigator.geolocation;
     if (!geo) {
@@ -858,12 +856,18 @@ export default function App() {
   };
 
   const mapCenter = (() => {
-    // If we're not following GPS and have a static center, use it
-    if (!isFollowingGPS && staticMapCenter) {
-      return staticMapCenter;
+    // If user has interacted with map and we're not following GPS, don't auto-update
+    if (!isFollowingGPS && userHasInteractedWithMap) {
+      // Map stays where user left it
+      return undefined; // Let Google Maps maintain its own position
     }
 
-    // Otherwise use normal logic
+    // If we're following GPS and have current position, use it
+    if (isFollowingGPS && currentGPS) {
+      return { lat: currentGPS.lat, lng: currentGPS.lon };
+    }
+
+    // Fallback to waypoints or default
     if (waypoints.length > 0) {
       return { lat: waypoints[0].lat, lng: waypoints[0].lon };
     }
@@ -877,60 +881,32 @@ export default function App() {
 
   const handleMapDragStart = () => {
     console.log("🗺️ User dragged map - stopping GPS follow");
-    setIsFollowingGPS(false); // Stop following GPS when user drags map
+    setIsFollowingGPS(false);
+    setUserHasInteractedWithMap(true);
   };
 
   const handleMapDragEnd = () => {
-    // When user finishes dragging, save that position
-    if (currentGPS) {
-      setStaticMapCenter({ lat: currentGPS.lat, lng: currentGPS.lon });
-    }
+    // Map stays where user dragged it - no need to save position
+    console.log("🗺️ Map drag ended - position maintained");
   };
 
   const recenterOnGPS = () => {
     if (currentGPS) {
       console.log("🎯 Re-centering on current GPS");
-      setIsFollowingGPS(true); // Resume following GPS
-      setStaticMapCenter(null); // Clear static center
+      setIsFollowingGPS(true);
+      setUserHasInteractedWithMap(false); // Reset interaction flag
+      // Force map to recenter by updating key
+      setRefreshKey((prev) => prev + 1);
     }
   };
 
   const handleMapZoomChanged = (map) => {
-    // Update zoom state but don't re-center
-    const newZoom = map.getZoom();
-    setMapZoom(newZoom);
-  };
-
-  // 4. RE-CENTER FUNCTIONS:
-  const recenterOnCurrentLocation = () => {
-    if (currentGPS) {
-      console.log("🎯 Re-centering on current GPS location");
-      setStaticMapCenter({ lat: currentGPS.lat, lng: currentGPS.lon });
-      setIsFollowingGPS(true);
-      setUserPannedMap(false);
+    if (map) {
+      const newZoom = map.getZoom();
+      setMapZoom(newZoom);
+      // Zooming counts as interaction but doesn't stop GPS follow by itself
+      setUserHasInteractedWithMap(true);
     }
-  };
-
-  const recenterOnRoute = () => {
-    if (waypoints.length > 0) {
-      console.log("🎯 Re-centering on route start");
-      setStaticMapCenter({ lat: waypoints[0].lat, lng: waypoints[0].lon });
-      setIsFollowingGPS(false); // Don't auto-follow, just center once
-      setUserPannedMap(false);
-    }
-  };
-
-  const toggleFollowGPS = () => {
-    const newFollowState = !isFollowingGPS;
-    setIsFollowingGPS(newFollowState);
-
-    if (newFollowState && currentGPS) {
-      // When enabling follow mode, center on current location
-      setStaticMapCenter({ lat: currentGPS.lat, lng: currentGPS.lon });
-    }
-
-    setUserPannedMap(false);
-    console.log("🗺️ GPS Follow mode:", newFollowState ? "ON" : "OFF");
   };
 
   const startVoiceInput = () => {
@@ -2427,12 +2403,12 @@ export default function App() {
           onClick={recenterOnGPS}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg ${
             isFollowingGPS
-              ? "bg-brown-600 text-white rounded hover:bg-brown-700"
-              : "bg-brown-600 text-white hover:bg-brown-700"
+              ? "bg-brown-600 text-white hover:bg-brown-700" // Blue when following
+              : "bg-blue-600 text-white hover:bg-blue-700" // Orange when not following
           }`}
-          title="Re-center map on current GPS location"
+          title={isFollowingGPS ? "Following GPS" : "Click to re-center on GPS"}
         >
-          📍 {isFollowingGPS ? "Following" : "Re-center"}
+          📍 {isFollowingGPS ? "Following GPS" : "Re-center"}
         </button>
       </div>
       {showMap && (
@@ -2448,24 +2424,31 @@ export default function App() {
               <RouteStatsOverlay />
 
               <GoogleMap
+                key={refreshKey} // Add key to force refresh when recentering
                 mapContainerStyle={{ width: "100%", height: "100%" }}
-                center={mapCenter} // ← USE STATIC CENTER
+                center={mapCenter} // Use dynamic center
                 zoom={mapZoom}
                 mapTypeId={mapType}
-                onDragStart={handleMapDragStart} // ← ADD THIS
+                onDragStart={handleMapDragStart}
                 onDragEnd={handleMapDragEnd}
-                onZoomChanged={() => {
-                  // Update zoom state if needed for other features
+                onZoomChanged={(e) => {
+                  const map = e || this;
+                  handleMapZoomChanged(map);
                 }}
                 options={{
                   zoomControl: true,
-                  mapTypeControl: false, // We have our custom control
+                  mapTypeControl: false,
                   streetViewControl: false,
                   fullscreenControl: true,
                   gestureHandling: "greedy",
                   disableDefaultUI: false,
+                  // Important: don't use disableDefaultUI: true as it can interfere
                 }}
-                onLoad={() => console.log("Map loaded")} // Add this to debug
+                onLoad={(map) => {
+                  console.log("Map loaded");
+                  // Store map reference if needed for programmatic control
+                  window.rallyMap = map;
+                }}
               >
                 {/* Current location marker with enhanced styling */}
                 <Marker

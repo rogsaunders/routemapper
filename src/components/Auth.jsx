@@ -62,7 +62,7 @@ export default function Auth() {
   );
 }
 
-export async function signupWithEmail(email, password) {
+export async function handleSignup(email, password) {
   try {
     const { data, error } = await supabase.auth.signUp({
       email,

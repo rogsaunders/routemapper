@@ -11,11 +11,12 @@ import stopSound from "./assets/sounds/stop.wav";
 import JSZip from "jszip";
 import React, { useEffect, useRef, useState } from "react";
 import ReplayRoute from "./ReplayRoute";
-import { supabase } from "./lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { dataSync } from "./services/dataSync";
 import Auth from "./components/Auth";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AuthCallback from "./routes/AuthCallback";
+
 
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -472,7 +473,9 @@ const exportFileIPadCompatible = async (
 
 const libraries = []; // declared outside the component or at top level
 
-function Home() {
+
+
+export default function App() {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: "AIzaSyCYZchsHu_Sd4KMNP1b6Dq30XzWWOuFPO8",
     libraries,
@@ -524,6 +527,19 @@ function Home() {
   const [user, setUser] = useState(null);
   const [syncStatus, setSyncStatus] = useState("offline");
 
+      return (
+      <BrowserRouter>
+        <Routes>
+          {/* your existing routes */}
+          <Route path="/" element={<Home />} />
+          {/* the new callback route */}
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          {/* 404, etc. */}
+        </Routes>
+      </BrowserRouter>
+    );
+  }
+  
   // Auth status check
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -1881,6 +1897,8 @@ function Home() {
     }
   };
 
+
+
   if (!isLoaded) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -3019,15 +3037,5 @@ function Home() {
         </div>
       </div>
     </div>
-  );
-}
-export default function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-      </Routes>
-    </BrowserRouter>
   );
 }

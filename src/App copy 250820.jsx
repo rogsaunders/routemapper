@@ -523,8 +523,6 @@ function Home() {
     useState(false);
   const [user, setUser] = useState(null);
   const [syncStatus, setSyncStatus] = useState("offline");
-  const [currentRecognition, setCurrentRecognition] = useState(null);
-  const [continuousListening, setContinuousListening] = useState(false);
 
   // Auth status check
   useEffect(() => {
@@ -910,7 +908,6 @@ function Home() {
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.continuous = false;
-    setCurrentRecognition(recognition);
 
     recognition.onstart = () => {
       setRecognitionActive(true);
@@ -945,7 +942,6 @@ function Home() {
     recognition.onerror = (event) => {
       console.error("Voice input error:", event.error);
       setRecognitionActive(false);
-      setCurrentRecognition(null);
 
       let errorMessage = "Voice recognition error.";
       switch (event.error) {
@@ -980,7 +976,6 @@ function Home() {
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.continuous = false;
-    setCurrentRecognition(recognition);
 
     recognition.onstart = () => {
       setRecognitionActive(true);
@@ -990,7 +985,6 @@ function Home() {
 
     recognition.onend = () => {
       setRecognitionActive(false);
-      setCurrentRecognition(null);
       new Audio(stopSound).play();
       console.log("🎤 Global voice recognition ended");
     };
@@ -1266,44 +1260,27 @@ function Home() {
   const processVoiceCommand = (transcript) => {
     const cleanText = transcript.trim().toLowerCase();
     console.log("🗣️ Voice input:", cleanText);
-    console.log("🎤 Heard:", cleanText); // Debug log to see exact text
 
     if (cleanText.toLowerCase().includes("undo")) {
       handleUndoLastWaypoint();
       return;
     }
 
-    if (
-      cleanText === "mic on" ||
-      cleanText === "mike on" ||
-      cleanText === "microphone on" ||
-      cleanText === "mick on" || // common misrecognition
-      cleanText === "make on" || // another common misrecognition
-      cleanText === "microphone on"
-    ) {
-      console.log("🟢 Mic On command detected - starting continuous listening");
-      startContinuousVoiceInput();
+    if (cleanText === "mic on" || cleanText === "microphone on") {
+      // Trigger Add Location
+      handleNaturalWaypoint("Voice waypoint");
       return;
     }
 
-    if (
-      cleanText === "mic off" ||
-      cleanText === "mike off" ||
-      cleanText === "microphone off" ||
-      cleanText === "mick off" ||
-      cleanText === "make off"
-    ) {
-      console.log("🔴 Mic Off command detected - stopping recognition");
+    if (cleanText === "mic off" || cleanText === "microphone off") {
       // Stop listening
-      if (currentRecognition) {
-        currentRecognition.stop();
+      if (recognition) {
+        recognition.stop();
         setRecognitionActive(false);
-        setCurrentRecognition(null);
-        setContinuousListening(false);
-        console.log("✅ Voice recognition stopped");
       }
       return;
     }
+    console.log("🎤 Heard:", cleanText);
 
     if (
       cleanText.toLowerCase().includes("stage start") ||
@@ -1329,68 +1306,15 @@ function Home() {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    if (!SpeechRecognition) {
-      alert("Speech Recognition is not supported in this browser.");
-      return;
-    }
-
     const recognition = new SpeechRecognition();
     recognition.lang = "en-AU";
     recognition.continuous = true; // Keep listening
     recognition.interimResults = false;
-    setCurrentRecognition(recognition);
-
-    recognition.onstart = () => {
-      setRecognitionActive(true);
-      setContinuousListening(true);
-      console.log("🎤 Continuous voice recognition started");
-      try {
-        new Audio(startSound).play().catch((err) => {
-          console.log("Audio play prevented:", err.message);
-        });
-      } catch (err) {
-        console.log("Audio not available");
-      }
-    };
 
     recognition.onresult = (event) => {
       const lastResult = event.results[event.results.length - 1];
       const spokenText = lastResult[0].transcript;
-      console.log("🗣️ Continuous voice input:", spokenText);
       processVoiceCommand(spokenText);
-    };
-
-    recognition.onerror = (event) => {
-      console.error("Continuous voice error:", event.error);
-      if (event.error !== "no-speech") {
-        // Ignore no-speech errors in continuous mode
-        setRecognitionActive(false);
-        setCurrentRecognition(null);
-        setContinuousListening(false);
-      }
-    };
-
-    recognition.onend = () => {
-      console.log("🎤 Continuous recognition ended");
-
-      // If we're supposed to be in continuous listening mode, restart
-      if (continuousListening && stageStarted) {
-        console.log("🔄 Restarting continuous listening...");
-        setTimeout(() => {
-          startContinuousVoiceInput();
-        }, 1000);
-      } else {
-        setRecognitionActive(false);
-        setCurrentRecognition(null);
-        setContinuousListening(false);
-        try {
-          new Audio(stopSound).play().catch((err) => {
-            console.log("Audio play prevented:", err.message);
-          });
-        } catch (err) {
-          console.log("Audio not available");
-        }
-      }
     };
 
     recognition.start();
@@ -1427,7 +1351,7 @@ function Home() {
       : 0;
 
     const waypoint = {
-      name: "Voice Marker",
+      name: formattedName,
       lat: currentGPS.lat,
       lon: currentGPS.lon,
       timestamp,
@@ -2818,35 +2742,6 @@ function Home() {
             ) : (
               <>🎤 Add Location</>
             )}
-          </button>
-
-          <button
-            onClick={
-              continuousListening
-                ? () => {
-                    if (currentRecognition) {
-                      currentRecognition.stop();
-                      setContinuousListening(false);
-                    }
-                  }
-                : startContinuousVoiceInput
-            }
-            type="button"
-            disabled={!stageStarted}
-            style={{
-              padding: "18px 16px",
-              borderRadius: "8px",
-              fontSize: "1.00rem",
-              backgroundColor: !stageStarted
-                ? "#e98547"
-                : continuousListening
-                ? "#EF4444"
-                : "#16a34a",
-              color: "white",
-              border: "2px solid #1e3a8a",
-            }}
-          >
-            {continuousListening ? "🔴 Stop Hands-Free" : "🎙️ Hands-Free Mode"}
           </button>
 
           <button

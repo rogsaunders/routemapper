@@ -1,0 +1,459 @@
+# Fix Supabase Authentication - Complete Setup Guide
+
+## Step 1: Create Missing Configuration Files
+
+### 1.1 Create `/src/lib/supabase.js`
+
+```javascript
+import { createClient } from '@supabase/supabase-js'
+
+// These should be in your .env.local file
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || ''
+
+// Debug logging
+console.log('Supabase URL configured:', !!supabaseUrl)
+console.log('Supabase Key configured:', !!supabaseAnonKey)
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing Supabase environment variables!')
+  console.error('Please check your .env.local file')
+}
+
+export const supabase = supabaseUrl && supabaseAnonKey 
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: window.localStorage,
+      }
+    })
+  : null
+```
+
+### 1.2 Create `.env.local` in your project root (NOT in src/)
+
+```env
+REACT_APP_SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=YOUR-ANON-KEY-HERE
+```
+
+**To get these values:**
+1. Go to https://app.supabase.com
+2. Select your project (or create one if you haven't)
+3. Go to Settings → API
+4. Copy:
+   - Project URL (looks like: `https://xyzxyzxyz.supabase.co`)
+   - Anon/Public Key (starts with: `eyJ...`)
+
+### 1.3 Create `/src/components/Auth.jsx`
+
+```javascript
+import { useState } from 'react'
+import { supabase } from '../lib/supabase'
+
+export default function Auth() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [isLogin, setIsLogin] = useState(true)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+
+  const handleAuth = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    setMessage('')
+
+    // Check if Supabase is configured
+    if (!supabase) {
+      setError('Supabase is not configured. Please check your environment variables.')
+      setLoading(false)
+      return
+    }
+
+    // Validate inputs
+    if (!email || !password) {
+      setError('Please enter both email and password')
+      setLoading(false)
+      return
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
+      setLoading(false)
+      return
+    }
+
+    try {
+      if (isLogin) {
+        // Sign In
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password,
+        })
+        
+        if (error) {
+          console.error('Login error:', error)
+          setError(error.message)
+        } else {
+          console.log('Login successful:', data)
+          setMessage('Login successful!')
+        }
+      } else {
+        // Sign Up
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password,
+          options: {
+            emailRedirectTo: window.location.origin,
+          }
+        })
+        
+        if (error) {
+          console.error('Signup error:', error)
+          setError(error.message)
+        } else if (data?.user?.identities?.length === 0) {
+          setError('This email is already registered. Please sign in instead.')
+        } else {
+          console.log('Signup successful:', data)
+          setMessage('Signup successful! Please check your email to confirm your account.')
+        }
+      }
+    } catch (err) {
+      console.error('Auth error:', err)
+      setError(err.message || 'An unexpected error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Test connection button for debugging
+  const testConnection = async () => {
+    if (!supabase) {
+      setError('Supabase client is not initialized')
+      return
+    }
+
+    try {
+      const { data, error } = await supabase.from('profiles').select('count').limit(1)
+      if (error) {
+        setError(`Connection test failed: ${error.message}`)
+      } else {
+        setMessage('Connection successful!')
+      }
+    } catch (err) {
+      setError(`Connection test error: ${err.message}`)
+    }
+  }
+
+  return (
+    <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+      <h2 className="text-2xl font-bold mb-6 text-center">
+        {isLogin ? 'Login' : 'Sign Up'} to Rally Mapper
+      </h2>
+      
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+          {error}
+        </div>
+      )}
+      
+      {message && (
+        <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+          {message}
+        </div>
+      )}
+      
+      <form onSubmit={handleAuth} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Email
+          </label>
+          <input
+            type="email"
+            placeholder="your@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Password
+          </label>
+          <input
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Minimum 6 characters
+          </p>
+        </div>
+        
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+        >
+          {loading ? 'Processing...' : isLogin ? 'Login' : 'Sign Up'}
+        </button>
+      </form>
+      
+      <div className="mt-4 text-center">
+        <button
+          onClick={() => {
+            setIsLogin(!isLogin)
+            setError('')
+            setMessage('')
+          }}
+          className="text-blue-600 hover:text-blue-800 text-sm"
+        >
+          {isLogin ? "Don't have an account? Sign Up" : 'Already have an account? Login'}
+        </button>
+      </div>
+      
+      {/* Debug section - remove in production */}
+      <div className="mt-6 pt-6 border-t border-gray-200">
+        <p className="text-xs text-gray-500 mb-2">Debug Info:</p>
+        <p className="text-xs text-gray-500">
+          Supabase: {supabase ? '✅ Configured' : '❌ Not configured'}
+        </p>
+        <button
+          onClick={testConnection}
+          className="mt-2 text-xs text-blue-600 hover:text-blue-800"
+        >
+          Test Supabase Connection
+        </button>
+      </div>
+    </div>
+  )
+}
+```
+
+### 1.4 Create `/src/services/dataSync.js`
+
+```javascript
+import { supabase } from '../lib/supabase'
+
+export const dataSync = {
+  // Check if user is authenticated
+  async checkAuth() {
+    if (!supabase) return null
+    const { data: { session } } = await supabase.auth.getSession()
+    return session
+  },
+
+  // Save route to Supabase
+  async saveRoute(routeData) {
+    if (!supabase) throw new Error('Supabase not configured')
+    
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const { data, error } = await supabase
+      .from('routes')
+      .insert({
+        route_name: routeData.routeName,
+        day_number: routeData.dayNumber,
+        route_number: routeData.routeNumber,
+        survey_date: routeData.surveyDate,
+        user_id: user.id
+      })
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  },
+
+  // Save stage with waypoints
+  async saveStage(stageData, routeId) {
+    if (!supabase) throw new Error('Supabase not configured')
+    
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+    
+    // Save stage
+    const { data: stage, error: stageError } = await supabase
+      .from('stages')
+      .insert({
+        route_id: routeId,
+        user_id: user.id,
+        stage_name: stageData.stageName,
+        stage_number: stageData.stageNumber,
+        start_gps: stageData.startGPS,
+        start_time: stageData.startTime,
+        waypoint_count: stageData.waypoints.length
+      })
+      .select()
+      .single()
+    
+    if (stageError) throw stageError
+    
+    // Save waypoints if any
+    if (stageData.waypoints && stageData.waypoints.length > 0) {
+      const waypoints = stageData.waypoints.map((wp, index) => ({
+        stage_id: stage.id,
+        route_id: routeId,
+        user_id: user.id,
+        waypoint_number: index + 1,
+        name: wp.name,
+        lat: wp.lat,
+        lon: wp.lon,
+        distance_from_start: wp.distance,
+        category: wp.category,
+        voice_created: wp.voiceCreated,
+        raw_transcript: wp.rawTranscript,
+        processed_text: wp.processedText,
+        poi_notes: wp.poi,
+        timestamp: wp.fullTimestamp
+      }))
+      
+      const { error: wpError } = await supabase
+        .from('waypoints')
+        .insert(waypoints)
+      
+      if (wpError) throw wpError
+    }
+    
+    return stage
+  },
+
+  // Save tracking points
+  async saveTrackingPoints(points, stageId) {
+    if (!supabase) throw new Error('Supabase not configured')
+    
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+    
+    const trackingData = points.map(pt => ({
+      stage_id: stageId,
+      user_id: user.id,
+      lat: pt.lat,
+      lon: pt.lon,
+      timestamp: pt.timestamp
+    }))
+    
+    const { error } = await supabase
+      .from('tracking_points')
+      .insert(trackingData)
+    
+    if (error) throw error
+  },
+
+  // Auto-save to localStorage with Supabase backup
+  async autoSave(data) {
+    // Always save to localStorage first
+    localStorage.setItem('rally_mapper_backup', JSON.stringify({
+      ...data,
+      lastSaved: new Date().toISOString()
+    }))
+    
+    // Only sync to Supabase if configured and authenticated
+    if (supabase) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          console.log('Auto-saving to Supabase...')
+          // Add your sync logic here
+        }
+      } catch (error) {
+        console.error('Supabase sync failed, data safe in localStorage', error)
+      }
+    }
+  }
+}
+```
+
+## Step 2: Verify Supabase Project Setup
+
+### 2.1 Check Authentication Settings
+
+1. Go to your Supabase Dashboard
+2. Navigate to **Authentication → Providers**
+3. Ensure **Email** is enabled
+4. Under **Email** settings, make sure:
+   - "Enable Email Confirmations" is set appropriately (turn OFF for testing)
+   - "Enable email provider" is ON
+
+### 2.2 Check CORS Settings
+
+1. In Supabase Dashboard, go to **Settings → API**
+2. Check that your domain is allowed (localhost should work by default)
+
+## Step 3: Test Your Setup
+
+### 3.1 Restart your development server
+
+```bash
+# Stop the server (Ctrl+C)
+# Then restart:
+npm start
+```
+
+### 3.2 Check browser console
+
+Open browser DevTools and check for:
+- "Supabase URL configured: true"
+- "Supabase Key configured: true"
+
+### 3.3 Common Issues and Fixes
+
+#### Issue: "Failed to fetch"
+**Solutions:**
+1. Check `.env.local` file exists in root (not in src/)
+2. Verify environment variables are correct
+3. Restart development server after adding .env.local
+4. Check network/firewall isn't blocking Supabase
+
+#### Issue: "Invalid API key"
+**Solution:** Copy the exact Anon/Public key from Supabase dashboard
+
+#### Issue: "User already registered"
+**Solution:** This email exists - use login instead of signup
+
+#### Issue: Email confirmation required
+**Solution:** 
+1. Check spam folder for confirmation email
+2. OR disable email confirmations in Supabase Dashboard (for development)
+
+## Step 4: Optional - Disable Email Confirmation (Development Only)
+
+If you want to test without email confirmation:
+
+1. Go to Supabase Dashboard
+2. Navigate to **Authentication → Providers → Email**
+3. Turn OFF "Enable email confirmations"
+4. Save changes
+
+## Step 5: Test Authentication Flow
+
+1. Click "Sign Up" in your app
+2. Enter email and password (min 6 characters)
+3. Submit form
+4. Check for success message
+5. If email confirmation is enabled, check your email
+6. Once confirmed/logged in, the app should show the main interface
+
+## Debugging Checklist
+
+- [ ] `.env.local` file exists in project root
+- [ ] Environment variables start with `REACT_APP_`
+- [ ] Supabase URL and Key are correctly copied
+- [ ] Development server was restarted after adding .env
+- [ ] Network allows connection to Supabase
+- [ ] Email provider is enabled in Supabase
+- [ ] Database tables exist (run SQL from earlier guide)
+- [ ] Row Level Security policies are set up
+
+If all else fails, you can always use the "Continue without account" option to use the app in guest mode (local storage only).

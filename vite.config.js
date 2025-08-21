@@ -2,10 +2,31 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import fs from "fs";
+import path from "path";
+
+// Function to get HTTPS config
+function getHttpsConfig() {
+  const keyPath = path.resolve("./localhost-key.pem");
+  const certPath = path.resolve("./localhost.pem");
+
+  // Check if certificate files exist
+  if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+    return {
+      key: fs.readFileSync(keyPath),
+      cert: fs.readFileSync(certPath),
+    };
+  }
+
+  // Fallback to basic HTTPS
+  console.warn("⚠️  Certificate files not found. Using basic HTTPS.");
+  console.warn("   Run: node generate-cert.mjs");
+  return true;
+}
 
 export default defineConfig({
   server: {
-    host: true,
+    https: getHttpsConfig(),
+    host: "0.0.0.0",
     port: 5173,
   },
 

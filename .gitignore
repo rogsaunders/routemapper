@@ -28,3 +28,8 @@ dist-ssr
 
 # Environment variables
 .env
+
+# SSL Certificates
+*.pem
+*.key
+*.crt

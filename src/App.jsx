@@ -13,9 +13,10 @@ import React, { useEffect, useRef, useState } from "react";
 import ReplayRoute from "./ReplayRoute";
 import { supabase } from "./lib/supabase";
 import { dataSync } from "./services/dataSync";
-import Auth from "./components/Auth";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AuthCallback from "./routes/AuthCallback";
+import Auth from "./components/Auth";
+import UserProfile from "./components/UserProfile";
 
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -525,6 +526,77 @@ function Home() {
   const [syncStatus, setSyncStatus] = useState("offline");
   const [currentRecognition, setCurrentRecognition] = useState(null);
   const [continuousListening, setContinuousListening] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const guestMode = localStorage.getItem("guestMode");
+
+      if (session) {
+        setUser(session.user);
+        setSyncStatus("online");
+        setIsAuthenticated(true);
+      } else if (guestMode) {
+        setUser("guest");
+        setSyncStatus("offline");
+        setIsAuthenticated(true);
+      } else {
+        setShowAuth(true);
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setUser(session.user);
+        setSyncStatus("online");
+        setIsAuthenticated(true);
+        setShowAuth(false);
+        localStorage.removeItem("guestMode");
+      } else {
+        const guestMode = localStorage.getItem("guestMode");
+        if (!guestMode) {
+          setUser(null);
+          setSyncStatus("offline");
+          setIsAuthenticated(false);
+          setShowAuth(true);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  });
+
+  // Add these handler functions to your Home component:
+  const handleAuthSuccess = (userType) => {
+    setIsAuthenticated(true);
+    setShowAuth(false);
+    if (userType === "guest") {
+      setUser("guest");
+      setSyncStatus("offline");
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (user === "guest") {
+      localStorage.removeItem("guestMode");
+      setUser(null);
+      setIsAuthenticated(false);
+      setShowAuth(true);
+      setSyncStatus("offline");
+    } else {
+      await supabase.auth.signOut();
+    }
+  };
 
   // Auth status check
   useEffect(() => {
@@ -2354,6 +2426,10 @@ function Home() {
       return null;
     }
 
+    if (!isAuthenticated || showAuth) {
+      return <Auth onAuthSuccess={handleAuthSuccess} />;
+    }
+
     return (
       <div className="absolute bottom-4 left-4 bg-white bg-opacity-95 rounded-lg shadow-lg p-4 z-50 min-w-48">
         <h3 className="font-bold text-gray-800 mb-2">Route Statistics</h3>
@@ -2387,33 +2463,45 @@ function Home() {
     <div className="p-4">
       {/* Sync Status Indicator */}
       <div className="fixed top-4 right-4 z-50">
-        <div
-          className={`px-3 py-1 rounded-full text-sm ${
-            syncStatus === "synced"
-              ? "bg-green-100 text-green-800"
-              : syncStatus === "syncing"
-              ? "bg-yellow-100 text-yellow-800"
-              : syncStatus === "error"
-              ? "bg-red-100 text-red-800"
-              : "bg-gray-100 text-gray-800"
-          }`}
-        >
-          {syncStatus === "synced"
-            ? "☁️ Saved"
-            : syncStatus === "syncing"
-            ? "🔄 Syncing..."
-            : syncStatus === "error"
-            ? "⚠️ Sync Error"
-            : "💾 Local Only"}
-        </div>
-        {user !== "guest" && (
-          <button
-            onClick={() => supabase.auth.signOut()}
-            className="mt-2 text-xs text-gray-500 hover:text-gray-700"
+        <div className="flex items-center space-x-2">
+          <div
+            className={`px-3 py-1 rounded-full text-sm ${
+              syncStatus === "synced"
+                ? "bg-green-100 text-green-800"
+                : syncStatus === "syncing"
+                ? "bg-yellow-100 text-yellow-800"
+                : syncStatus === "error"
+                ? "bg-red-100 text-red-800"
+                : "bg-gray-100 text-gray-800"
+            }`}
           >
-            Sign Out
+            {syncStatus === "synced"
+              ? "☁️ Saved"
+              : syncStatus === "syncing"
+              ? "🔄 Syncing..."
+              : syncStatus === "error"
+              ? "⚠️ Sync Error"
+              : "💾 Local Only"}
+          </div>
+
+          {user && user !== "guest" && (
+            <button
+              onClick={() => setShowProfile(true)}
+              className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm hover:bg-blue-200"
+              title="User Profile"
+            >
+              👤 {user.email?.split("@")[0] || "Profile"}
+            </button>
+          )}
+
+          <button
+            onClick={handleSignOut}
+            className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm hover:bg-red-200"
+            title="Sign Out"
+          >
+            🚪 {user === "guest" ? "Exit Guest" : "Sign Out"}
           </button>
-        )}
+        </div>
       </div>
 
       <WaypointSuccessNotification />
@@ -3158,6 +3246,9 @@ function Home() {
           </div>
         </div>
       </div>
+      {showProfile && user !== "guest" && (
+        <UserProfile user={user} onClose={() => setShowProfile(false)} />
+      )}
     </div>
   );
 }

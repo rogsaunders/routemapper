@@ -1427,7 +1427,7 @@ function Home() {
       : 0;
 
     const waypoint = {
-      name: "Voice Marker",
+      name: formattedName,
       lat: currentGPS.lat,
       lon: currentGPS.lon,
       timestamp,

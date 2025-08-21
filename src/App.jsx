@@ -530,6 +530,27 @@ function Home() {
   const [showProfile, setShowProfile] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  const handleAuthSuccess = (userType) => {
+    setIsAuthenticated(true);
+    setShowAuth(false);
+    if (userType === "guest") {
+      setUser("guest");
+      setSyncStatus("offline");
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (user === "guest") {
+      localStorage.removeItem("guestMode");
+      setUser(null);
+      setIsAuthenticated(false);
+      setShowAuth(true);
+      setSyncStatus("offline");
+    } else {
+      await supabase.auth.signOut();
+    }
+  };
+
   useEffect(() => {
     const checkAuth = async () => {
       const {
@@ -575,28 +596,6 @@ function Home() {
 
     return () => subscription.unsubscribe();
   });
-
-  // Add these handler functions to your Home component:
-  const handleAuthSuccess = (userType) => {
-    setIsAuthenticated(true);
-    setShowAuth(false);
-    if (userType === "guest") {
-      setUser("guest");
-      setSyncStatus("offline");
-    }
-  };
-
-  const handleSignOut = async () => {
-    if (user === "guest") {
-      localStorage.removeItem("guestMode");
-      setUser(null);
-      setIsAuthenticated(false);
-      setShowAuth(true);
-      setSyncStatus("offline");
-    } else {
-      await supabase.auth.signOut();
-    }
-  };
 
   // Auth status check
   useEffect(() => {
@@ -2075,6 +2074,21 @@ function Home() {
     );
   }
 
+  if (!isAuthenticated || showAuth) {
+    return <Auth onAuthSuccess={handleAuthSuccess} />;
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Loading Rally Mapper...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (gpsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -2424,10 +2438,6 @@ function Home() {
   const RouteStatsOverlay = () => {
     if (!showRouteStats || waypoints.length === 0) {
       return null;
-    }
-
-    if (!isAuthenticated || showAuth) {
-      return <Auth onAuthSuccess={handleAuthSuccess} />;
     }
 
     return (

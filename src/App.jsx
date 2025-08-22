@@ -17,6 +17,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AuthCallback from "./routes/AuthCallback";
 import Auth from "./components/Auth";
 import UserProfile from "./components/UserProfile";
+import ResetPassword from "./routes/ResetPassword";
 
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -3268,6 +3269,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/auth/reset-password" element={<ResetPassword />} />
       </Routes>
     </BrowserRouter>
   );

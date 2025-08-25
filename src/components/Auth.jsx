@@ -1,4 +1,4 @@
-// 1. First, create a comprehensive Auth component (components/Auth.jsx)
+// Updated Auth component (components/Auth.jsx) with improved UI
 
 import React, { useState } from "react";
 import { supabase } from "../lib/supabase";
@@ -53,7 +53,6 @@ const Auth = ({ onAuthSuccess }) => {
   const signInAsGuest = async () => {
     setLoading(true);
     try {
-      // For guest mode, we'll just set a local flag
       localStorage.setItem("guestMode", "true");
       if (onAuthSuccess) onAuthSuccess("guest");
     } catch (error) {
@@ -87,10 +86,13 @@ const Auth = ({ onAuthSuccess }) => {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleAuth}>
-          <div className="rounded-md shadow-sm -space-y-px">
+          <div className="rounded-md shadow-sm space-y-4">
             <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Email Address
               </label>
               <input
                 id="email"
@@ -98,15 +100,19 @@ const Auth = ({ onAuthSuccess }) => {
                 type="email"
                 autoComplete="email"
                 required
-                className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
+                className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
+
             {!isResetPassword && (
               <div>
-                <label htmlFor="password" className="sr-only">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Password
                 </label>
                 <input
@@ -115,8 +121,8 @@ const Auth = ({ onAuthSuccess }) => {
                   type="password"
                   autoComplete={isSignUp ? "new-password" : "current-password"}
                   required
-                  className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder="Password"
+                  className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -154,8 +160,9 @@ const Auth = ({ onAuthSuccess }) => {
             </button>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="text-sm">
+          {/* Fixed layout for forgot password and need account buttons */}
+          <div className="space-y-5">
+            <div className="text-left">
               <button
                 type="button"
                 onClick={() => {
@@ -164,13 +171,14 @@ const Auth = ({ onAuthSuccess }) => {
                   setError("");
                   setMessage("");
                 }}
-                className="font-medium text-blue-600 hover:text-blue-500"
+                className="font-medium text-blue-600 hover:text-blue-500 text-sm"
               >
                 {isResetPassword ? "Back to sign in" : "Forgot your password?"}
               </button>
             </div>
+
             {!isResetPassword && (
-              <div className="text-sm">
+              <div className="text-left">
                 <button
                   type="button"
                   onClick={() => {
@@ -179,7 +187,7 @@ const Auth = ({ onAuthSuccess }) => {
                     setError("");
                     setMessage("");
                   }}
-                  className="font-medium text-blue-600 hover:text-blue-500"
+                  className="font-medium text-blue-600 hover:text-blue-500 text-sm"
                 >
                   {isSignUp ? "Already have an account?" : "Need an account?"}
                 </button>

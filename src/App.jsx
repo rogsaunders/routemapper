@@ -2555,7 +2555,7 @@ function Home() {
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg ${
             isFollowingGPS
               ? "bg-brown-600 text-white hover:bg-blue-700"
-              : "bg-orange-600 text-white hover:bg-orange-700"
+              : "bg-green-600 text-white hover:bg-orange-700"
           }`}
           title={isFollowingGPS ? "Following GPS" : "Click to re-center on GPS"}
         >
@@ -2736,7 +2736,7 @@ function Home() {
                 Day {currentDay}
               </span>
               <button
-                className="bg-blue-600 text-white px-2 py-2 rounded text-sm hover:bg-blue-700"
+                className="bg-green-600 text-white px-2 py-2 rounded text-sm hover:bg-blue-700"
                 onClick={handleNewDay}
                 title="Start new day"
               >

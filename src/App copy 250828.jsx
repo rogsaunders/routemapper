@@ -11,6 +11,13 @@ import stopSound from "./assets/sounds/stop.wav";
 import JSZip from "jszip";
 import React, { useEffect, useRef, useState } from "react";
 import ReplayRoute from "./ReplayRoute";
+import { supabase } from "./lib/supabase";
+import { dataSync } from "./services/dataSync";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import AuthCallback from "./routes/AuthCallback";
+import Auth from "./components/Auth";
+import UserProfile from "./components/UserProfile";
+import ResetPassword from "./routes/ResetPassword";
 
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -125,7 +132,6 @@ function mapCategoryToStandardIcon(category, description) {
     },
   };
 
-  // Ensure this return statement is inside a valid function or component
   return (
     iconMapping[category] || {
       icon: "waypoint",
@@ -361,7 +367,6 @@ const exportFileIPadCompatible = async (
     console.log(`📄 MIME type: ${mimeType}`);
     console.log(`📄 File size: ${new Blob([content]).size} bytes`);
 
-    // Debug environment first
     const env = {
       userAgent: navigator.userAgent,
       platform: navigator.platform,
@@ -389,29 +394,16 @@ const exportFileIPadCompatible = async (
         const file = new File([blob], filename, { type: mimeType });
         console.log(`📤 Attempting share sheet: ${file.name}`);
 
-        const sharePromise = navigator.share({
-          files: [file],
-          title: title,
-          text: `Rally route export: ${filename}`,
-        });
-
         await navigator.share({
           files: [file],
           title: title,
           text: `Rally route export: ${filename}`,
         });
 
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Share timeout")), 5000)
-        );
-
-        await Promise.race([sharePromise, timeoutPromise]);
-
         console.log("✅ Share sheet successful");
         return { success: true, method: "share_sheet" };
       } catch (shareErr) {
         console.log("⚠️ Share sheet failed:", shareErr.message);
-        // Continue to fallback methods
       }
     }
 
@@ -419,27 +411,17 @@ const exportFileIPadCompatible = async (
     if (env.downloadSupport && env.urlSupport) {
       try {
         console.log("📥 Attempting direct download");
-
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = filename;
         a.style.display = "none";
-
-        // Add to DOM, click, remove - iPad sometimes needs this
         document.body.appendChild(a);
-
-        // Give iPad time to process
-        await new Promise((resolve) => setTimeout(resolve, 100));
-
         a.click();
-
-        // Clean up after delay
         setTimeout(() => {
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
         }, 1000);
-
         console.log("✅ Direct download triggered");
         return { success: true, method: "direct_download" };
       } catch (downloadErr) {
@@ -450,12 +432,9 @@ const exportFileIPadCompatible = async (
     // METHOD 3: Open in new window (iPad fallback)
     try {
       console.log("🔗 Attempting new window method");
-
       const url = URL.createObjectURL(blob);
       const newWindow = window.open(url, "_blank");
-
       if (newWindow) {
-        // Clean up after window opens
         setTimeout(() => URL.revokeObjectURL(url), 5000);
         console.log("✅ New window opened");
         return { success: true, method: "new_window" };
@@ -469,7 +448,6 @@ const exportFileIPadCompatible = async (
     // METHOD 4: Data URL (last resort)
     try {
       console.log("📋 Attempting data URL method");
-
       const reader = new FileReader();
       return new Promise((resolve) => {
         reader.onload = () => {
@@ -495,7 +473,8 @@ const exportFileIPadCompatible = async (
 };
 
 const libraries = []; // declared outside the component or at top level
-export default function App() {
+
+function Home() {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: "AIzaSyCYZchsHu_Sd4KMNP1b6Dq30XzWWOuFPO8",
     libraries,
@@ -518,19 +497,21 @@ export default function App() {
   const [isTracking, setIsTracking] = useState(false);
   const [stageStarted, setstageStarted] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const isLocalhost = ["localhost", "127.0.0.1"].includes(location.hostname);
+  const canUseGeo = window.isSecureContext || isLocalhost;
+  const [showGeoBanner, setShowGeoBanner] = useState(!canUseGeo);
+  const [allowNoGPS, setAllowNoGPS] = useState(false);
   const [totalDistance, setTotalDistance] = useState(0);
   const [selectedWaypoint, setSelectedWaypoint] = useState(null);
   const [showEndstageConfirm, setShowEndstageConfirm] = useState(false);
   const [showStartstageConfirm, setShowStartstageConfirm] = useState(false);
   const [currentDay, setCurrentDay] = useState(1);
-  const [dayRoutes, setDayRoutes] = useState([]); // Track routes per day
-  const [currentRoute, setCurrentRoute] = useState(1); // Route number within current day
-  // Add these new state variables for inline editing
-  const [editingWaypoint, setEditingWaypoint] = useState(null); // Index of waypoint being edited
-  const [editValues, setEditValues] = useState({ name: "", poi: "" }); // Temporary edit values
-  const [selectedWaypoints, setSelectedWaypoints] = useState(new Set()); // Set of selected waypoint indices
-  const [bulkSelectMode, setBulkSelectMode] = useState(false); // Whether bulk selection is active
-  // Visual feedback states
+  const [dayRoutes, setDayRoutes] = useState([]);
+  const [currentRoute, setCurrentRoute] = useState(1);
+  const [editingWaypoint, setEditingWaypoint] = useState(null);
+  const [editValues, setEditValues] = useState({ name: "", poi: "" });
+  const [selectedWaypoints, setSelectedWaypoints] = useState(new Set());
+  const [bulkSelectMode, setBulkSelectMode] = useState(false);
   const [gpsAccuracy, setGpsAccuracy] = useState(null);
   const [gpsLoading, setGpsLoading] = useState(true);
   const [gpsError, setGpsError] = useState(null);
@@ -538,14 +519,121 @@ export default function App() {
   const [stageLoading, setstageLoading] = useState(false);
   const [showUndo, setShowUndo] = useState(false);
   const [undoTimeLeft, setUndoTimeLeft] = useState(5);
-  const [showVoiceInstructions, setShowVoiceInstructions] = useState(false); // Add this state
-  // Map enhancement states
+  const [showVoiceInstructions, setShowVoiceInstructions] = useState(false);
   const [mapType, setMapType] = useState("roadmap");
   const [showRouteStats, setShowRouteStats] = useState(false);
   const [mapZoom, setMapZoom] = useState(15);
-  const [isFollowingGPS, setIsFollowingGPS] = useState(true); // Start following GPS
-  const [staticMapCenter, setStaticMapCenter] = useState(null); // Fixed center when not following
+  const [isFollowingGPS, setIsFollowingGPS] = useState(true);
+  const [staticMapCenter, setStaticMapCenter] = useState(null);
+  const [userHasInteractedWithMap, setUserHasInteractedWithMap] =
+    useState(false);
+  const [user, setUser] = useState(null);
+  const [syncStatus, setSyncStatus] = useState("offline");
+  const [currentRecognition, setCurrentRecognition] = useState(null);
+  const [continuousListening, setContinuousListening] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  const handleAuthSuccess = (userType) => {
+    setIsAuthenticated(true);
+    setShowAuth(false);
+    if (userType === "guest") {
+      setUser("guest");
+      setSyncStatus("offline");
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (user === "guest") {
+      localStorage.removeItem("guestMode");
+      setUser(null);
+      setIsAuthenticated(false);
+      setShowAuth(true);
+      setSyncStatus("offline");
+    } else {
+      await supabase.auth.signOut();
+    }
+  };
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const guestMode = localStorage.getItem("guestMode");
+
+      if (session) {
+        setUser(session.user);
+        setSyncStatus("online");
+        setIsAuthenticated(true);
+      } else if (guestMode) {
+        setUser("guest");
+        setSyncStatus("offline");
+        setIsAuthenticated(true);
+      } else {
+        setShowAuth(true);
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setUser(session.user);
+        setSyncStatus("online");
+        setIsAuthenticated(true);
+        setShowAuth(false);
+        localStorage.removeItem("guestMode");
+      } else {
+        const guestMode = localStorage.getItem("guestMode");
+        if (!guestMode) {
+          setUser(null);
+          setSyncStatus("offline");
+          setIsAuthenticated(false);
+          setShowAuth(true);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  });
+
+  // Auth status check
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setSyncStatus(session ? "online" : "offline");
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setSyncStatus(session ? "online" : "offline");
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Auto-save to Supabase
+  useEffect(() => {
+    if (user && user !== "guest" && waypoints.length > 0) {
+      const saveTimer = setTimeout(() => {
+        dataSync
+          .autoSave({ waypoints, trackingPoints, routeName })
+          .then(() => setSyncStatus("synced"))
+          .catch(() => setSyncStatus("error"));
+      }, 5000);
+
+      return () => clearTimeout(saveTimer);
+    }
+  }, [waypoints, user, trackingPoints, routeName]);
+
+  // Load saved waypoints
   useEffect(() => {
     const stored = localStorage.getItem("unsavedWaypoints");
     if (stored) {
@@ -553,88 +641,84 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("unsavedWaypoints");
-    if (saved) setWaypoints(JSON.parse(saved));
-  }, []);
+  // GPS tracking
+  // Replace the GPS tracking useEffect (around line 700) with this fixed version:
 
   useEffect(() => {
-    const geo = navigator.geolocation;
-    if (!geo) {
-      console.error("Geolocation is not supported.");
-      setGpsError("Geolocation is not supported by this device");
-      setGpsLoading(false);
-      return;
-    }
+    // Secure-context guard: GPS only works on HTTPS or localhost
+    const isLocalhost = ["localhost", "127.0.0.1"].includes(location.hostname);
+    const canUseGeo = window.isSecureContext || isLocalhost;
 
-    setGpsLoading(true);
+    // Clear any previous error
     setGpsError(null);
 
-    const handleSuccess = (pos) => {
+    // If not secure, don't try to use geolocation; keep app functional
+    if (!canUseGeo || !("geolocation" in navigator)) {
+      setGpsError("Geolocation requires HTTPS (or localhost in dev).");
+      setGpsLoading(false); // ✅ IMPORTANT: Stop loading even if GPS fails
+      return; // no cleanup needed
+    }
+
+    const geo = navigator.geolocation;
+    let watchId = null;
+    let cancelled = false;
+
+    const handleOk = (pos) => {
+      if (cancelled) return;
       const { latitude, longitude, accuracy } = pos.coords;
       const gps = { lat: latitude, lon: longitude };
+
       setCurrentGPS(gps);
-      setGpsAccuracy(accuracy);
-      setGpsLoading(false);
-      setGpsError(null);
-      console.log(
-        "📍 GPS Updated:",
-        gps.lat.toFixed(6),
-        gps.lon.toFixed(6),
-        "Accuracy:",
-        Math.round(accuracy) + "m"
-      );
+      setStartGPS((prev) => prev || gps);
+      setGpsAccuracy(accuracy); // Set accuracy if you have this state
+      setGpsLoading(false); // ✅ IMPORTANT: Stop loading on success
+      setGpsError(null); // Clear any previous errors
     };
 
     const handleError = (err) => {
-      console.error("❌ GPS error", err);
-      setGpsLoading(false);
+      if (cancelled) return;
+      console.error("GPS error", err);
 
-      // More detailed error messages
-      switch (err.code) {
-        case err.PERMISSION_DENIED:
-          setGpsError(
-            "GPS access denied. Please enable location permissions in your browser settings."
-          );
-          break;
-        case err.POSITION_UNAVAILABLE:
-          setGpsError(
-            "GPS signal unavailable. Try moving to an open area or reloading the page."
-          );
-          break;
-        case err.TIMEOUT:
-          setGpsError("GPS timeout. Trying again...");
-          // Retry after timeout
-          setTimeout(() => {
-            setGpsLoading(true);
-            setGpsError(null);
-          }, 2000);
-          break;
-        default:
-          setGpsError(
-            `GPS error (${err.code}): ${err.message}. Check your location settings.`
-          );
+      // Friendly messages
+      let errorMessage = "GPS error";
+      if (err.code === 1) {
+        errorMessage = "Permission denied. Please allow location.";
+      } else if (err.code === 2) {
+        errorMessage = "Position unavailable. Move near a window or outdoors.";
+      } else if (err.code === 3) {
+        errorMessage = "Timeout getting location. Retrying...";
+      } else {
+        errorMessage = err.message || "Geolocation error";
       }
+
+      setGpsError(errorMessage);
+      setGpsLoading(false); // ✅ IMPORTANT: Stop loading even on error
     };
 
-    const options = {
+    // 1) Try to get a quick one-off position first
+    geo.getCurrentPosition(handleOk, handleError, {
       enableHighAccuracy: true,
       timeout: 15000,
-      maximumAge: 60000,
-    };
+      maximumAge: 0,
+    });
 
-    // Get initial position
-    geo.getCurrentPosition(handleSuccess, handleError, options);
+    // 2) Start continuous updates
+    watchId = geo.watchPosition(handleOk, handleError, {
+      enableHighAccuracy: true,
+      timeout: 20000,
+      maximumAge: 5000,
+    });
 
-    // Start watching position
-    const watchId = geo.watchPosition(handleSuccess, handleError, options);
-
+    // Cleanup
     return () => {
-      if (watchId) {
-        geo.clearWatch(watchId);
+      cancelled = true;
+      if (watchId !== null) {
+        try {
+          geo.clearWatch(watchId);
+        } catch {}
       }
     };
-  }, []);
+  }, []); // run once on mount
 
   useEffect(() => {
     setTodayDate(new Date().toISOString().split("T")[0]);
@@ -685,7 +769,7 @@ export default function App() {
               return [...prev, newPoint];
             });
 
-            setCurrentGPS({ lat: newPoint.lat, lon: newPoint.lon }); // update live
+            setCurrentGPS({ lat: newPoint.lat, lon: newPoint.lon });
             console.log("📍 Auto-tracked:", newPoint);
           },
           (err) => console.error("❌ GPS error", err),
@@ -695,7 +779,7 @@ export default function App() {
     }, 20000);
 
     return () => clearInterval(interval);
-  }, [isTracking]);
+  }, [isTracking, currentGPS]);
 
   useEffect(() => {
     if (!showUndo) return;
@@ -714,7 +798,6 @@ export default function App() {
   }, [showUndo]);
 
   const handleNewDay = () => {
-    // Show confirmation if there's existing data
     if (waypoints.length > 0 || routeName.trim() !== "") {
       const confirmNewDay = window.confirm(
         `Start Day ${
@@ -725,7 +808,6 @@ export default function App() {
       if (!confirmNewDay) return;
     }
 
-    // Clear all data and increment day
     setCurrentDay((prev) => prev + 1);
     setCurrentRoute(1);
     setRouteName("");
@@ -738,15 +820,12 @@ export default function App() {
     setIsTracking(false);
     setTotalDistance(0);
 
-    // Clear localStorage
     localStorage.removeItem("unsavedWaypoints");
 
     console.log(`📅 Started Day ${currentDay + 1}`);
   };
 
-  // ← ADD handleNewRoute as a SEPARATE function (outside handleNewDay)
   const handleNewRoute = () => {
-    // Show confirmation if there's existing route data
     if (waypoints.length > 0 || routeName.trim() !== "") {
       const confirmNewRoute = window.confirm(
         `Start new route? This will clear current route data (stages, waypoints). Make sure you've exported your current route first.`
@@ -755,17 +834,15 @@ export default function App() {
       if (!confirmNewRoute) return;
     }
 
-    // Clear route-specific data but keep day
     setCurrentRoute((prev) => prev + 1);
     setRouteName("");
     setWaypoints([]);
     setTrackingPoints([]);
-    setstageCount(1); // ← FIXED: lowercase 's'
-    setstageStarted(false); // ← FIXED: lowercase 's'
+    setstageCount(1);
+    setstageStarted(false);
     setIsTracking(false);
     setTotalDistance(0);
 
-    // Clear localStorage
     localStorage.removeItem("unsavedWaypoints");
 
     console.log(`🗺️ Started Route ${currentRoute + 1} for Day ${currentDay}`);
@@ -779,9 +856,8 @@ export default function App() {
 
     const now = new Date();
     const timestamp = now.toLocaleTimeString();
-    const fullTimestamp = now.toISOString(); // Add this line
+    const fullTimestamp = now.toISOString();
 
-    // Calculate cumulative distance from stage start
     const cumulativeDistance = startGPS
       ? calculateCumulativeDistance(waypoints, currentGPS.lat, currentGPS.lon)
       : 0;
@@ -791,17 +867,15 @@ export default function App() {
       lat: currentGPS.lat,
       lon: currentGPS.lon,
       timestamp,
-      fullTimestamp, // Add this line
+      fullTimestamp,
       distance: cumulativeDistance,
       poi: "",
     };
     setWaypoints((prev) => [...prev, waypoint]);
 
-    // Visual feedback for successful waypoint addition
     setWaypointAdded(true);
     setTimeout(() => setWaypointAdded(false), 2000);
 
-    // Haptic feedback if available
     if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
 
     console.log("✅ Waypoint added:", waypoint);
@@ -810,30 +884,44 @@ export default function App() {
     setUndoTimeLeft(5);
   };
 
+  const handleStartstageClick = () => {
+    if (!currentGPS) {
+      const proceed = window.confirm(
+        "GPS isn’t available (non-HTTPS or permission denied). Start the stage without GPS?"
+      );
+      if (!proceed) return;
+      setAllowNoGPS(true);
+    }
+    handleStartstage();
+  };
   const handleStartstage = () => {
+    if (!currentGPS) {
+      setGpsError("No GPS available");
+      return;
+    }
+
     setstageLoading(true);
     setstageStarted(true);
-    setIsTracking(true); // ✅ Start tracking immediately
-    setTrackingPoints([]); // ✅ Reset previous tracking points
-    setWaypoints([]); // Optional: also reset waypoints if needed
+    setIsTracking(true);
+    setTrackingPoints([]);
+    setWaypoints([]);
     setTotalDistance(0);
-    setIsFollowingGPS(true); // Start following GPS for new stage
-    setStaticMapCenter(null); // Clear any previous static center
+    setIsFollowingGPS(true);
+    setUserHasInteractedWithMap(false);
 
-    const geo = navigator.geolocation;
-    if (!geo) {
+    if (!canUseGeo || !navigator.geolocation) {
       console.error("❌ Geolocation not supported");
       setGpsError("Geolocation not supported on this device");
-      setstageLoading(false);
+      setstageLoading(true);
       setRefreshKey((prev) => prev + 1);
       return;
     }
 
-    geo.getCurrentPosition(
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
         const newGPS = { lat: latitude, lon: longitude };
-        setStartGPS(newGPS);
+        setStartGPS(currentGPS);
         setCurrentGPS(newGPS);
 
         const stageName = `Day${currentDay}/Route${currentRoute}/Stage${stageCount}`;
@@ -844,26 +932,29 @@ export default function App() {
         setstage((prev) => [...prev, { name: stageName, waypoints: [] }]);
         setstageName(stageName);
         setstageCount((prev) => prev + 1);
-        setstageLoading(false);
+        setstageLoading(true);
 
         console.log("✅ Start stage Initialized:", stageName, newGPS);
       },
       (err) => {
         console.error("❌ Failed to get GPS:", err);
+        console.log("Error details:", err.code, err.message);
         setGpsError("Failed to get starting GPS position. Please try again.");
-        setstageLoading(false);
+        setstageLoading(true);
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 6000 }
     );
   };
 
   const mapCenter = (() => {
-    // If we're not following GPS and have a static center, use it
-    if (!isFollowingGPS && staticMapCenter) {
-      return staticMapCenter;
+    if (!isFollowingGPS && userHasInteractedWithMap) {
+      return undefined;
     }
 
-    // Otherwise use normal logic
+    if (isFollowingGPS && currentGPS) {
+      return { lat: currentGPS.lat, lng: currentGPS.lon };
+    }
+
     if (waypoints.length > 0) {
       return { lat: waypoints[0].lat, lng: waypoints[0].lon };
     }
@@ -877,60 +968,29 @@ export default function App() {
 
   const handleMapDragStart = () => {
     console.log("🗺️ User dragged map - stopping GPS follow");
-    setIsFollowingGPS(false); // Stop following GPS when user drags map
+    setIsFollowingGPS(false);
+    setUserHasInteractedWithMap(true);
   };
 
   const handleMapDragEnd = () => {
-    // When user finishes dragging, save that position
-    if (currentGPS) {
-      setStaticMapCenter({ lat: currentGPS.lat, lng: currentGPS.lon });
-    }
+    console.log("🗺️ Map drag ended - position maintained");
   };
 
   const recenterOnGPS = () => {
     if (currentGPS) {
       console.log("🎯 Re-centering on current GPS");
-      setIsFollowingGPS(true); // Resume following GPS
-      setStaticMapCenter(null); // Clear static center
+      setIsFollowingGPS(true);
+      setUserHasInteractedWithMap(false);
+      setRefreshKey((prev) => prev + 1);
     }
   };
 
   const handleMapZoomChanged = (map) => {
-    // Update zoom state but don't re-center
-    const newZoom = map.getZoom();
-    setMapZoom(newZoom);
-  };
-
-  // 4. RE-CENTER FUNCTIONS:
-  const recenterOnCurrentLocation = () => {
-    if (currentGPS) {
-      console.log("🎯 Re-centering on current GPS location");
-      setStaticMapCenter({ lat: currentGPS.lat, lng: currentGPS.lon });
-      setIsFollowingGPS(true);
-      setUserPannedMap(false);
+    if (map) {
+      const newZoom = map.getZoom();
+      setMapZoom(newZoom);
+      setUserHasInteractedWithMap(true);
     }
-  };
-
-  const recenterOnRoute = () => {
-    if (waypoints.length > 0) {
-      console.log("🎯 Re-centering on route start");
-      setStaticMapCenter({ lat: waypoints[0].lat, lng: waypoints[0].lon });
-      setIsFollowingGPS(false); // Don't auto-follow, just center once
-      setUserPannedMap(false);
-    }
-  };
-
-  const toggleFollowGPS = () => {
-    const newFollowState = !isFollowingGPS;
-    setIsFollowingGPS(newFollowState);
-
-    if (newFollowState && currentGPS) {
-      // When enabling follow mode, center on current location
-      setStaticMapCenter({ lat: currentGPS.lat, lng: currentGPS.lon });
-    }
-
-    setUserPannedMap(false);
-    console.log("🗺️ GPS Follow mode:", newFollowState ? "ON" : "OFF");
   };
 
   const startVoiceInput = () => {
@@ -946,10 +1006,10 @@ export default function App() {
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.continuous = false;
+    setCurrentRecognition(recognition);
 
     recognition.onstart = () => {
       setRecognitionActive(true);
-      // Try to play sound, but don't fail if it doesn't work
       try {
         new Audio(startSound).play().catch((err) => {
           console.log("Audio play prevented:", err.message);
@@ -962,7 +1022,6 @@ export default function App() {
 
     recognition.onend = () => {
       setRecognitionActive(false);
-      // Try to play sound, but don't fail if it doesn't work
       try {
         new Audio(stopSound).play().catch((err) => {
           console.log("Audio play prevented:", err.message);
@@ -982,6 +1041,7 @@ export default function App() {
     recognition.onerror = (event) => {
       console.error("Voice input error:", event.error);
       setRecognitionActive(false);
+      setCurrentRecognition(null);
 
       let errorMessage = "Voice recognition error.";
       switch (event.error) {
@@ -1016,6 +1076,7 @@ export default function App() {
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.continuous = false;
+    setCurrentRecognition(recognition);
 
     recognition.onstart = () => {
       setRecognitionActive(true);
@@ -1025,6 +1086,7 @@ export default function App() {
 
     recognition.onend = () => {
       setRecognitionActive(false);
+      setCurrentRecognition(null);
       new Audio(stopSound).play();
       console.log("🎤 Global voice recognition ended");
     };
@@ -1032,7 +1094,6 @@ export default function App() {
     recognition.onresult = (event) => {
       const spokenText = event.results[0][0].transcript;
       console.log("🗣️ Global voice input received:", spokenText);
-
       processGlobalVoiceCommand(spokenText);
     };
 
@@ -1064,7 +1125,6 @@ export default function App() {
     const cleanText = transcript.trim().toLowerCase();
     console.log("🗣️ Processing global command:", cleanText);
 
-    // Handle stage start command (works before stage starts)
     if (
       cleanText.includes("stage start") ||
       cleanText.includes("start stage")
@@ -1077,7 +1137,6 @@ export default function App() {
       return;
     }
 
-    // Handle stage end command (only works during stage)
     if (cleanText.includes("stage end") || cleanText.includes("end stage")) {
       if (stageStarted) {
         setShowEndstageConfirm(true);
@@ -1088,7 +1147,6 @@ export default function App() {
       return;
     }
 
-    // If stage is started, use normal voice processing
     if (stageStarted) {
       processVoiceCommand(transcript);
     } else {
@@ -1100,7 +1158,6 @@ export default function App() {
   const detectCategory = (description) => {
     const text = description.toLowerCase();
 
-    // Multi-word pattern matching for better accuracy
     const patterns = {
       safety: [
         /danger|hazard|warning|careful|watch|avoid|risk|unsafe/,
@@ -1139,7 +1196,6 @@ export default function App() {
       ],
     };
 
-    // Score each category based on pattern matches
     let bestCategory = "general";
     let bestScore = 0;
 
@@ -1166,9 +1222,7 @@ export default function App() {
   const smartTextCorrection = (rawText) => {
     let corrected = rawText.toLowerCase().trim();
 
-    // Common voice recognition errors for rally terms
     const corrections = {
-      // Direction corrections
       write: "right",
       wright: "right",
       rite: "right",
@@ -1176,8 +1230,6 @@ export default function App() {
       laugh: "left",
       strait: "straight",
       "straight ahead": "straight",
-
-      // Rally-specific corrections
       grade: "grid",
       great: "grid",
       greed: "grid",
@@ -1191,22 +1243,16 @@ export default function App() {
       washout: "washout",
       "wash out": "washout",
       wash: "washout",
-
-      // Surface corrections
       "gravel road": "gravel",
       "tarmac road": "tarmac",
       "sealed road": "tarmac",
       "dirt road": "dirt",
       unsealed: "gravel",
-
-      // Distance/measurement corrections
       "next to k": "next 2k",
       "next 2 k": "next 2k",
       "next two k": "next 2k",
       "for 1k": "for 1k",
       "for one k": "for 1k",
-
-      // Common rally phrases
       "turn left": "left turn",
       "turn right": "right turn",
       "keep going left": "keep left",
@@ -1215,7 +1261,6 @@ export default function App() {
       "continue straight": "keep straight",
     };
 
-    // Apply corrections
     for (const [wrong, right] of Object.entries(corrections)) {
       corrected = corrected.replace(new RegExp(wrong, "gi"), right);
     }
@@ -1226,40 +1271,30 @@ export default function App() {
   const expandRallyTerms = (text) => {
     let expanded = text;
 
-    // Common rally abbreviations and expansions
     const expansions = {
-      // Directional
       l: "left",
       r: "right",
       str: "straight",
       kr: "keep right",
       kl: "keep left",
       ks: "keep straight",
-
-      // Rally features
       cg: "cattle grid",
       wg: "wire gate",
       fg: "fence gate",
       br: "bridge",
       fd: "ford",
       xing: "crossing",
-
-      // Surfaces
       gr: "gravel",
       tar: "tarmac",
       conc: "concrete",
       dt: "dirt",
       rgh: "rough",
       sth: "smooth",
-
-      // Hazards
       dngr: "danger",
       caut: "caution",
       bump: "bump",
       hole: "hole",
       wo: "washout",
-
-      // Distances (preserve these exactly)
       "1k": "1k",
       "2k": "2k",
       "3k": "3k",
@@ -1267,7 +1302,6 @@ export default function App() {
       "5k": "5k",
     };
 
-    // Apply expansions (whole words only)
     for (const [abbrev, full] of Object.entries(expansions)) {
       const regex = new RegExp(`\\b${abbrev}\\b`, "gi");
       expanded = expanded.replace(regex, full);
@@ -1277,12 +1311,11 @@ export default function App() {
   };
 
   const getSpeedContext = () => {
-    // Calculate current speed from recent tracking points
     if (trackingPoints.length < 2) return "unknown";
 
     const recent = trackingPoints.slice(-2);
     const timeDiff =
-      (new Date(recent[1].timestamp) - new Date(recent[0].timestamp)) / 1000; // seconds
+      (new Date(recent[1].timestamp) - new Date(recent[0].timestamp)) / 1000;
     const distance =
       parseFloat(
         calculateDistance(
@@ -1291,10 +1324,10 @@ export default function App() {
           recent[1].lat,
           recent[1].lon
         )
-      ) * 1000; // meters
+      ) * 1000;
 
-    const speedMPS = distance / timeDiff; // meters per second
-    const speedKMH = speedMPS * 3.6; // km/h
+    const speedMPS = distance / timeDiff;
+    const speedKMH = speedMPS * 3.6;
 
     if (speedKMH > 80) return "fast";
     if (speedKMH > 40) return "medium";
@@ -1307,26 +1340,19 @@ export default function App() {
 
     switch (speed) {
       case "fast":
-        // High speed - prefer brief, essential info
         processed = processed
           .replace(/followed by/g, "→")
           .replace(/next stage/g, "next")
           .replace(/approximately/g, "~");
         break;
-
       case "medium":
-        // Medium speed - standard processing
         break;
-
       case "slow":
-        // Low speed - can handle detailed descriptions
         processed = processed
           .replace(/→/g, "followed by")
           .replace(/~/g, "approximately");
         break;
-
       default:
-        // Unknown speed - standard processing
         break;
     }
 
@@ -1334,12 +1360,44 @@ export default function App() {
   };
 
   const processVoiceCommand = (transcript) => {
-    const cleanText = transcript.trim();
+    const cleanText = transcript.trim().toLowerCase();
     console.log("🗣️ Voice input:", cleanText);
+    console.log("🎤 Heard:", cleanText); // Debug log to see exact text
 
-    // Check for special commands first
     if (cleanText.toLowerCase().includes("undo")) {
       handleUndoLastWaypoint();
+      return;
+    }
+
+    if (
+      cleanText === "mic on" ||
+      cleanText === "mike on" ||
+      cleanText === "microphone on" ||
+      cleanText === "mick on" || // common misrecognition
+      cleanText === "make on" || // another common misrecognition
+      cleanText === "microphone on"
+    ) {
+      console.log("🟢 Mic On command detected - starting continuous listening");
+      startContinuousVoiceInput();
+      return;
+    }
+
+    if (
+      cleanText === "mic off" ||
+      cleanText === "mike off" ||
+      cleanText === "microphone off" ||
+      cleanText === "mick off" ||
+      cleanText === "make off"
+    ) {
+      console.log("🔴 Mic Off command detected - stopping recognition");
+      // Stop listening
+      if (currentRecognition) {
+        currentRecognition.stop();
+        setRecognitionActive(false);
+        setCurrentRecognition(null);
+        setContinuousListening(false);
+        console.log("✅ Voice recognition stopped");
+      }
       return;
     }
 
@@ -1359,8 +1417,79 @@ export default function App() {
       return;
     }
 
-    // Everything else becomes a waypoint with natural description
     handleNaturalWaypoint(cleanText);
+  };
+
+  // Add continuous listening mode
+  const startContinuousVoiceInput = () => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Speech Recognition is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-AU";
+    recognition.continuous = true; // Keep listening
+    recognition.interimResults = false;
+    setCurrentRecognition(recognition);
+
+    recognition.onstart = () => {
+      setRecognitionActive(true);
+      setContinuousListening(true);
+      console.log("🎤 Continuous voice recognition started");
+      try {
+        new Audio(startSound).play().catch((err) => {
+          console.log("Audio play prevented:", err.message);
+        });
+      } catch (err) {
+        console.log("Audio not available");
+      }
+    };
+
+    recognition.onresult = (event) => {
+      const lastResult = event.results[event.results.length - 1];
+      const spokenText = lastResult[0].transcript;
+      console.log("🗣️ Continuous voice input:", spokenText);
+      processVoiceCommand(spokenText);
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Continuous voice error:", event.error);
+      if (event.error !== "no-speech") {
+        // Ignore no-speech errors in continuous mode
+        setRecognitionActive(false);
+        setCurrentRecognition(null);
+        setContinuousListening(false);
+      }
+    };
+
+    recognition.onend = () => {
+      console.log("🎤 Continuous recognition ended");
+
+      // If we're supposed to be in continuous listening mode, restart
+      if (continuousListening && stageStarted) {
+        console.log("🔄 Restarting continuous listening...");
+        setTimeout(() => {
+          startContinuousVoiceInput();
+        }, 1000);
+      } else {
+        setRecognitionActive(false);
+        setCurrentRecognition(null);
+        setContinuousListening(false);
+        try {
+          new Audio(stopSound).play().catch((err) => {
+            console.log("Audio play prevented:", err.message);
+          });
+        } catch (err) {
+          console.log("Audio not available");
+        }
+      }
+    };
+
+    recognition.start();
   };
 
   const handleNaturalWaypoint = (description) => {
@@ -1374,7 +1503,6 @@ export default function App() {
       return;
     }
 
-    // Step 1: Smart corrections for voice recognition errors
     const corrected = smartTextCorrection(description);
     const expanded = expandRallyTerms(corrected);
     const speed = getSpeedContext();
@@ -1388,7 +1516,7 @@ export default function App() {
 
     const now = new Date();
     const timestamp = now.toLocaleTimeString();
-    const fullTimestamp = now.toISOString(); // Add this line
+    const fullTimestamp = now.toISOString();
 
     const cumulativeDistance = startGPS
       ? calculateCumulativeDistance(waypoints, currentGPS.lat, currentGPS.lon)
@@ -1399,7 +1527,7 @@ export default function App() {
       lat: currentGPS.lat,
       lon: currentGPS.lon,
       timestamp,
-      fullTimestamp, // Add this line
+      fullTimestamp,
       distance: cumulativeDistance,
       poi: "",
       iconSrc: "",
@@ -1412,12 +1540,10 @@ export default function App() {
 
     setWaypoints((prev) => [...prev, waypoint]);
 
-    // Visual and haptic feedback
     setWaypointAdded(true);
     setTimeout(() => setWaypointAdded(false), 2000);
     if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
 
-    // Show undo option
     setShowUndo(true);
     setUndoTimeLeft(5);
   };
@@ -1446,7 +1572,6 @@ export default function App() {
     setEditingWaypoint(null);
     setEditValues({ name: "", poi: "" });
 
-    // Haptic feedback
     if (navigator.vibrate) navigator.vibrate([30]);
 
     console.log("✅ Waypoint edited");
@@ -1467,7 +1592,7 @@ export default function App() {
 
   const toggleBulkSelectMode = () => {
     setBulkSelectMode(!bulkSelectMode);
-    setSelectedWaypoints(new Set()); // Clear selections when toggling mode
+    setSelectedWaypoints(new Set());
   };
 
   const toggleWaypointSelection = (index) => {
@@ -1484,10 +1609,8 @@ export default function App() {
 
   const selectAllWaypoints = () => {
     if (selectedWaypoints.size === waypoints.length) {
-      // If all selected, deselect all
       setSelectedWaypoints(new Set());
     } else {
-      // Select all waypoints
       setSelectedWaypoints(new Set(waypoints.map((_, index) => index)));
     }
   };
@@ -1495,7 +1618,6 @@ export default function App() {
   const deleteSelectedWaypoints = () => {
     if (selectedWaypoints.size === 0) return;
 
-    // Show confirmation
     const confirmDelete = window.confirm(
       `Delete ${selectedWaypoints.size} selected waypoint${
         selectedWaypoints.size !== 1 ? "s" : ""
@@ -1504,7 +1626,6 @@ export default function App() {
 
     if (!confirmDelete) return;
 
-    // Remove selected waypoints (in reverse order to maintain indices)
     const indicesToDelete = Array.from(selectedWaypoints).sort((a, b) => b - a);
 
     setWaypoints((prev) => {
@@ -1515,29 +1636,22 @@ export default function App() {
       return updated;
     });
 
-    // Clear selections and exit bulk mode
     setSelectedWaypoints(new Set());
     setBulkSelectMode(false);
 
-    // Haptic feedback
     if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
 
     console.log(`🗑️ Deleted ${selectedWaypoints.size} waypoints`);
   };
 
-  // MISSING FUNCTION - Add this back to your App.jsx
-
   const handleUndoLastWaypoint = () => {
     if (waypoints.length === 0) return;
 
-    // Remove last waypoint
     setWaypoints((prev) => prev.slice(0, -1));
 
-    // Hide undo option
     setShowUndo(false);
     setUndoTimeLeft(5);
 
-    // Haptic feedback
     if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
 
     console.log("↩️ Last waypoint undone");
@@ -1616,7 +1730,6 @@ export default function App() {
         },
       };
 
-      // ✅ USE IPAD-COMPATIBLE HELPER (this was missing!)
       const content = JSON.stringify(data, null, 2);
       const result = await exportFileIPadCompatible(
         content,
@@ -1693,7 +1806,6 @@ export default function App() {
       const gpxContent = buildGPX(waypointsData, trackingData, name);
       console.log("🔍 GPX content length:", gpxContent.length);
 
-      // ✅ USE IPAD-COMPATIBLE HELPER (this was missing!)
       const result = await exportFileIPadCompatible(
         gpxContent,
         `${name}.gpx`,
@@ -1719,11 +1831,10 @@ export default function App() {
         "🔍 Starting Rally Navigator GPX export (iPad compatible)..."
       );
 
-      // Rally Navigator optimized GPX structure
       const rallyGPX = `<?xml version="1.0" encoding="UTF-8"?>
   <gpx version="1.1" creator="RallyMapper-Voice" xmlns="http://www.topografix.com/GPX/1/1">
     <metadata>
-      <name>${name}</name>
+      <n>${name}</n>
       <desc>Rally route with voice instructions - ${
         waypointsData.length
       } waypoints</desc>
@@ -1736,7 +1847,7 @@ export default function App() {
         const waypointNumber = (index + 1).toString().padStart(3, "0");
         return `
     <wpt lat="${wp.lat}" lon="${wp.lon}">
-      <name>${waypointNumber} - ${wp.name}</name>
+      <n>${waypointNumber} - ${wp.name}</n>
       <desc>${wp.name}</desc>
       <cmt>Rally instruction: ${wp.name} at ${wp.distance}km</cmt>
       <type>waypoint</type>
@@ -1746,14 +1857,14 @@ export default function App() {
   
     <!-- Route with turn instructions -->
     <rte>
-      <name>${name} Instructions</name>
+      <n>${name} Instructions</n>
       <desc>Rally route with ${waypointsData.length} instruction points</desc>
       ${waypointsData
         .map((wp, index) => {
           const waypointNumber = (index + 1).toString().padStart(3, "0");
           return `
       <rtept lat="${wp.lat}" lon="${wp.lon}">
-        <name>${waypointNumber} - ${wp.name}</name>
+        <n>${waypointNumber} - ${wp.name}</n>
         <desc>${wp.name}</desc>
         <cmt>${wp.name}</cmt>
       </rtept>`;
@@ -1766,7 +1877,7 @@ export default function App() {
         ? `
     <!-- GPS Track -->
     <trk>
-      <name>${name} Track</name>
+      <n>${name} Track</n>
       <trkseg>
         ${trackingData
           .map(
@@ -1782,9 +1893,8 @@ export default function App() {
     }
   </gpx>`;
 
-      // ✅ USE IPAD-COMPATIBLE HELPER (this was missing!)
       const result = await exportFileIPadCompatible(
-        gpxContent,
+        rallyGPX,
         `${name}.gpx`,
         "application/gpx+xml",
         "Rally Mapper GPX Export"
@@ -1797,33 +1907,6 @@ export default function App() {
       throw error;
     }
   };
-
-  // ADD THIS BUTTON TO YOUR DEBUG stage:
-  <button
-    className="bg-indigo-600 text-white px-3 py-2 rounded text-sm hover:bg-indigo-700"
-    onClick={async () => {
-      if (waypoints.length === 0) {
-        alert("❌ No waypoints to export! Add some waypoints first.");
-        return;
-      }
-
-      try {
-        setGpsError("📤 Exporting Rally Navigator GPX...");
-
-        const testName = routeName || `rally-route-${Date.now()}`;
-        await exportAsRallyNavigatorGPX(waypoints, trackingPoints, testName);
-
-        setGpsError("✅ Rally Navigator GPX exported!");
-        setTimeout(() => setGpsError(null), 3000);
-      } catch (error) {
-        console.error("❌ Rally Navigator export failed:", error);
-        setGpsError("❌ Rally Navigator export failed");
-        setTimeout(() => setGpsError(null), 3000);
-      }
-    }}
-  >
-    🧭 Rally Navigator GPX
-  </button>;
 
   const exportAsKML = async (
     waypointsData = waypoints,
@@ -1849,14 +1932,178 @@ export default function App() {
     }
   };
 
+  const handleEndstage = async () => {
+    try {
+      setstageStarted(false);
+      setUndoTimeLeft(5);
+      setIsFollowingGPS(true);
+
+      const stageNameFormatted = `${todayDate}/Stage ${stageCount}`;
+      const currentstage = { name: stageNameFormatted, waypoints };
+
+      const summary = {
+        name: stageNameFormatted,
+        waypointCount: waypoints.length,
+        startTime: waypoints[0]?.timestamp || "N/A",
+        endTime: waypoints[waypoints.length - 1]?.timestamp || "N/A",
+        totalDistance: waypoints
+          .reduce((sum, wp) => sum + parseFloat(wp.distance || 0), 0)
+          .toFixed(2),
+        pois: [...new Set(waypoints.map((wp) => wp.poi).filter(Boolean))],
+        startCoords: waypoints[0]
+          ? `${waypoints[0].lat.toFixed(5)}, ${waypoints[0].lon.toFixed(5)}`
+          : "N/A",
+        endCoords: waypoints[waypoints.length - 1]
+          ? `${waypoints[waypoints.length - 1].lat.toFixed(5)}, ${waypoints[
+              waypoints.length - 1
+            ].lon.toFixed(5)}`
+          : "N/A",
+        routeName: routeName || "Unnamed Route",
+      };
+
+      setstage((prev) => [...prev, currentstage]);
+      setstageSummaries((prev) => [...prev, summary]);
+
+      setGpsError("📤 Exporting files (iPad compatible)...");
+
+      const exportName = routeName || stageNameFormatted;
+
+      console.log("🔍 === MAIN EXPORT PROCESS START ===");
+      console.log("Export name:", exportName);
+      console.log("Waypoints:", waypoints.length);
+      console.log("Tracking points:", trackingPoints.length);
+
+      // SUPABASE INTEGRATION (if user is logged in)
+      if (user && user !== "guest") {
+        try {
+          setSyncStatus("syncing");
+
+          let routeId = localStorage.getItem("current_route_id");
+          if (!routeId) {
+            const route = await dataSync.saveRoute({
+              routeName: routeName || `Day ${currentDay} Route ${currentRoute}`,
+              dayNumber: currentDay,
+              routeNumber: currentRoute,
+              surveyDate: todayDate,
+            });
+            routeId = route.id;
+            localStorage.setItem("current_route_id", routeId);
+          }
+
+          const stageData = await dataSync.saveStage(
+            {
+              stageName: stageNameFormatted,
+              stageNumber: stageCount,
+              startGPS: startGPS,
+              startTime: waypoints[0]?.fullTimestamp,
+              waypoints: waypoints,
+            },
+            routeId
+          );
+
+          if (trackingPoints.length > 0 && stageData?.id) {
+            await dataSync.saveTrackingPoints(trackingPoints, stageData.id);
+          }
+
+          setSyncStatus("synced");
+          console.log("✅ Data saved to Supabase");
+        } catch (error) {
+          console.error("Supabase save failed:", error);
+          setSyncStatus("error");
+        }
+      }
+
+      // Export files locally
+      const exportResults = [];
+
+      try {
+        console.log("📤 Starting sequential exports...");
+
+        const json1 = await exportAsJSON(waypoints, trackingPoints, exportName);
+        exportResults.push(json1);
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        const json2 = await exportAsSimpleJSON(
+          waypoints,
+          trackingPoints,
+          exportName
+        );
+        exportResults.push(json2);
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        const gpx = await exportAsGPX(waypoints, trackingPoints, exportName);
+        exportResults.push(gpx);
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        const kml = await exportAsKML(waypoints, trackingPoints, exportName);
+        exportResults.push(kml);
+
+        console.log("📤 All sequential exports completed");
+      } catch (error) {
+        console.error("❌ Sequential export failed:", error);
+      }
+
+      const successCount = exportResults.filter((r) => r && r.success).length;
+
+      console.log("🔍 Export results:", exportResults);
+      console.log("🔍 === MAIN EXPORT PROCESS END ===");
+
+      if (successCount === exportResults.length) {
+        setGpsError("✅ All 4 files exported successfully!");
+      } else if (successCount > 0) {
+        const formatNames = ["Enhanced JSON", "Simple JSON", "GPX", "KML"];
+        const successful = exportResults
+          .map((result, i) => (result?.success ? formatNames[i] : null))
+          .filter(Boolean);
+        const failed = exportResults
+          .map((result, i) => (!result?.success ? formatNames[i] : null))
+          .filter(Boolean);
+
+        setGpsError(
+          `⚠️ ${successCount}/${
+            exportResults.length
+          } files exported.\n✅ ${successful.join(", ")}\n❌ ${failed.join(
+            ", "
+          )}`
+        );
+      } else {
+        setGpsError("❌ All exports failed. Check console for details.");
+      }
+
+      setTimeout(() => setGpsError(null), 10000);
+
+      setRefreshKey((prev) => prev + 1);
+      setIsTracking(false);
+      localStorage.removeItem("unsavedWaypoints");
+
+      if (waypoints.length === 0) {
+        localStorage.removeItem("current_route_id");
+      }
+
+      console.log("Stage ended and exports completed.");
+    } catch (error) {
+      console.error("❌ handleEndstage error:", error);
+      setGpsError("❌ Stage end failed. Check console.");
+      setTimeout(() => setGpsError(null), 5000);
+    }
+  };
+
   if (!isLoaded) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Loading Rally Mapper...</p>
+      <>
+        {showGeoBanner && (
+          <div className="mb-2 rounded bg-yellow-100 text-yellow-900 p-2 text-sm">
+            GPS requires HTTPS or localhost. Use an HTTPS tunnel for live GPS,
+            or start a stage without GPS.
+          </div>
+        )}
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-lg text-gray-600">Loading Rally Mapper...</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -1874,13 +2121,11 @@ export default function App() {
     );
   }
 
-  // Create polyline path from waypoints for route visualization
   const routePath = waypoints.map((wp) => ({
     lat: wp.lat,
     lng: wp.lon,
   }));
 
-  // Calculate route statistics
   const routeDistance =
     waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0;
   const routeStats = {
@@ -1903,7 +2148,6 @@ export default function App() {
         : 0,
   };
 
-  // Map type options
   const mapTypes = [
     { key: "roadmap", label: "Road", icon: "🗺️" },
     { key: "satellite", label: "Satellite", icon: "🛰️" },
@@ -1911,7 +2155,6 @@ export default function App() {
     { key: "hybrid", label: "Hybrid", icon: "🔀" },
   ];
 
-  // GPS Status Component
   const GPSStatus = () => {
     if (gpsError) {
       return (
@@ -1954,7 +2197,7 @@ export default function App() {
             <span className="mr-3">
               {currentGPS.lat.toFixed(6)}, {currentGPS.lon.toFixed(6)}
             </span>
-            .Accuracy: ±{gpsAccuracy ? Math.round(gpsAccuracy) : "?"}m.
+            Accuracy: ±{gpsAccuracy ? Math.round(gpsAccuracy) : "?"}m
             <span
               className={`ml-2 px-2 py-1 rounded text-xs ${
                 gpsAccuracy <= 10
@@ -1976,7 +2219,6 @@ export default function App() {
     );
   };
 
-  // Success notification for waypoint addition
   const WaypointSuccessNotification = () => {
     if (!waypointAdded) return null;
 
@@ -1988,144 +2230,6 @@ export default function App() {
         </div>
       </div>
     );
-  };
-
-  const handleEndstage = async () => {
-    try {
-      setstageStarted(false);
-      setUndoTimeLeft(5);
-      setIsFollowingGPS(true); // Resume following GPS after stage ends
-
-      const stageNameFormatted = `${todayDate}/Stage ${stageCount}`;
-      const currentstage = { name: stageNameFormatted, waypoints };
-
-      const summary = {
-        name: stageNameFormatted,
-        waypointCount: waypoints.length,
-        startTime: waypoints[0]?.timestamp || "N/A",
-        endTime: waypoints[waypoints.length - 1]?.timestamp || "N/A",
-        totalDistance: waypoints
-          .reduce((sum, wp) => sum + parseFloat(wp.distance || 0), 0)
-          .toFixed(2),
-        pois: [...new Set(waypoints.map((wp) => wp.poi).filter(Boolean))],
-        startCoords: waypoints[0]
-          ? `${waypoints[0].lat.toFixed(5)}, ${waypoints[0].lon.toFixed(5)}`
-          : "N/A",
-        endCoords: waypoints[waypoints.length - 1]
-          ? `${waypoints[waypoints.length - 1].lat.toFixed(5)}, ${waypoints[
-              waypoints.length - 1
-            ].lon.toFixed(5)}`
-          : "N/A",
-        routeName: routeName || "Unnamed Route",
-      };
-
-      setstage((prev) => [...prev, currentstage]);
-      setstageSummaries((prev) => [...prev, summary]);
-
-      // Show user what's happening
-      setGpsError("📤 Exporting files (iPad compatible)...");
-
-      const exportName = routeName || stageNameFormatted;
-
-      console.log("🔍 === MAIN EXPORT PROCESS START ===");
-      console.log("Export name:", exportName);
-      console.log("Waypoints:", waypoints.length);
-      console.log("Tracking points:", trackingPoints.length);
-
-      // Use iPad-compatible export functions with individual error handling
-      const exportPromises = [
-        exportAsJSON(waypoints, trackingPoints, exportName).catch((err) => {
-          console.error("JSON export failed:", err);
-          return { success: false, error: err.message };
-        }),
-        exportAsSimpleJSON(waypoints, trackingPoints, exportName).catch(
-          (err) => {
-            console.error("Simple JSON export failed:", err);
-            return { success: false, error: err.message };
-          }
-        ),
-        exportAsGPX(waypoints, trackingPoints, exportName).catch((err) => {
-          console.error("GPX export failed:", err);
-          return { success: false, error: err.message };
-        }),
-        exportAsKML(waypoints, trackingPoints, exportName).catch((err) => {
-          console.error("KML export failed:", err);
-          return { success: false, error: err.message };
-        }),
-      ];
-
-      // Wait for all exports to complete
-      const exportResults = [];
-
-      try {
-        console.log("📤 Starting sequential exports...");
-
-        // Export 1: Enhanced JSON
-        const json1 = await exportAsJSON(waypoints, trackingPoints, exportName);
-        exportResults.push(json1);
-        await new Promise((resolve) => setTimeout(resolve, 2000)); // 2 second delay
-
-        // Export 2: Simple JSON
-        const json2 = await exportAsSimpleJSON(
-          waypoints,
-          trackingPoints,
-          exportName
-        );
-        exportResults.push(json2);
-        await new Promise((resolve) => setTimeout(resolve, 2000)); // 2 second delay
-
-        // Export 3: GPX
-        const gpx = await exportAsGPX(waypoints, trackingPoints, exportName);
-        exportResults.push(gpx);
-        await new Promise((resolve) => setTimeout(resolve, 2000)); // 2 second delay
-
-        // Export 4: KML
-        const kml = await exportAsKML(waypoints, trackingPoints, exportName);
-        exportResults.push(kml);
-
-        console.log("📤 All sequential exports completed");
-      } catch (error) {
-        console.error("❌ Sequential export failed:", error);
-      }
-
-      console.log("🔍 Export results:", results);
-      console.log("🔍 === MAIN EXPORT PROCESS END ===");
-
-      // Provide detailed feedback
-      if (successCount === exportResults.length) {
-        setGpsError("✅ All 4 files exported successfully!");
-      } else if (successCount > 0) {
-        const formatNames = ["Enhanced JSON", "Simple JSON", "GPX", "KML"];
-        const successful = results
-          .map((success, i) => (success ? formatNames[i] : null))
-          .filter(Boolean);
-        const failed = results
-          .map((success, i) => (!success ? formatNames[i] : null))
-          .filter(Boolean);
-
-        setGpsError(
-          `⚠️ ${successCount}/${
-            exportResults.length
-          } files exported.\n✅ ${successful.join(", ")}\n❌ ${failed.join(
-            ", "
-          )}`
-        );
-      } else {
-        setGpsError("❌ All exports failed. Check console for details.");
-      }
-
-      setTimeout(() => setGpsError(null), 10000); // Longer display time for detailed message
-
-      setRefreshKey((prev) => prev + 1);
-      setIsTracking(false);
-      localStorage.removeItem("unsavedWaypoints");
-
-      console.log("Stage ended and exports completed.");
-    } catch (error) {
-      console.error("❌ handleEndstage error:", error);
-      setGpsError("❌ Stage end failed. Check console.");
-      setTimeout(() => setGpsError(null), 5000);
-    }
   };
 
   const StartstageConfirmDialog = () => {
@@ -2307,10 +2411,8 @@ export default function App() {
     );
   };
 
-  // Map Controls Component
   const MapControls = () => (
     <>
-      {/* Map Type Selector - Top Left */}
       <div
         style={{ position: "absolute", top: "8px", left: "8px", zIndex: 10 }}
       >
@@ -2334,7 +2436,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Route Stats Toggle - Top Right */}
       <div
         style={{ position: "absolute", top: "8px", right: "8px", zIndex: 10 }}
       >
@@ -2386,22 +2487,68 @@ export default function App() {
     );
   };
 
+  if (!isAuthenticated || showAuth) {
+    return <Auth onAuthSuccess={handleAuthSuccess} />;
+  }
+
   return (
     <div className="p-4">
-      {/* Success notification overlay */}
+      {/* Sync Status Indicator */}
+      <div className="fixed top-4 right-4 z-50">
+        <div className="flex items-center space-x-2">
+          <div
+            className={`px-3 py-1 rounded-full text-sm ${
+              syncStatus === "synced"
+                ? "bg-green-100 text-green-800"
+                : syncStatus === "syncing"
+                ? "bg-yellow-100 text-yellow-800"
+                : syncStatus === "error"
+                ? "bg-red-100 text-red-800"
+                : "bg-gray-100 text-gray-800"
+            }`}
+          >
+            {syncStatus === "synced"
+              ? "☁️ Saved"
+              : syncStatus === "syncing"
+              ? "🔄 Syncing..."
+              : syncStatus === "error"
+              ? "⚠️ Sync Error"
+              : "💾 Local Only"}
+          </div>
+
+          {user && user !== "guest" && (
+            <button
+              onClick={() => setShowProfile(true)}
+              className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm hover:bg-blue-200"
+              title="User Profile"
+            >
+              👤 {user.email?.split("@")[0] || "Profile"}
+            </button>
+          )}
+
+          <button
+            onClick={handleSignOut}
+            className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm hover:bg-red-200"
+            title="Sign Out"
+          >
+            🚪 {user === "guest" ? "Exit Guest" : "Sign Out"}
+          </button>
+        </div>
+      </div>
+
       <WaypointSuccessNotification />
-      {/* End stage Confirmation Dialog */}
       <EndstageConfirmDialog />
-      {/* Start stage Confirmation Dialog */}
       <StartstageConfirmDialog />
+
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold text-blue-800 flex items-center gap-2">
           <img src="/RRM Logo 64x64.png" className="w-8 h-8" alt="RRM Logo" />
           Rally Route Mapper
         </h1>
       </div>
-      {/* GPS Status Display */}
+
       <GPSStatus />
+
       <div className="flex gap-4 mb-4">
         <button
           className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700 text-sm"
@@ -2423,18 +2570,20 @@ export default function App() {
         </button>
 
         {showReplay && <ReplayRoute waypoints={waypoints} />}
+
         <button
           onClick={recenterOnGPS}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg ${
             isFollowingGPS
-              ? "bg-brown-600 text-white rounded hover:bg-brown-700"
-              : "bg-brown-600 text-white hover:bg-brown-700"
+              ? "bg-brown-600 text-white hover:bg-blue-700"
+              : "bg-green-600 text-white hover:bg-orange-700"
           }`}
-          title="Re-center map on current GPS location"
+          title={isFollowingGPS ? "Following GPS" : "Click to re-center on GPS"}
         >
-          📍 {isFollowingGPS ? "Following" : "Re-center"}
+          📍 {isFollowingGPS ? "Following GPS" : "Re-center"}
         </button>
       </div>
+
       {showMap && (
         <div
           className={`relative w-full mb-2 ${
@@ -2443,31 +2592,34 @@ export default function App() {
         >
           {isLoaded && currentGPS && (
             <>
-              {/* Map overlay controls */}
               <MapControls />
               <RouteStatsOverlay />
 
               <GoogleMap
+                key={refreshKey}
                 mapContainerStyle={{ width: "100%", height: "100%" }}
-                center={mapCenter} // ← USE STATIC CENTER
+                center={mapCenter}
                 zoom={mapZoom}
                 mapTypeId={mapType}
-                onDragStart={handleMapDragStart} // ← ADD THIS
+                onDragStart={handleMapDragStart}
                 onDragEnd={handleMapDragEnd}
-                onZoomChanged={() => {
-                  // Update zoom state if needed for other features
+                onZoomChanged={(e) => {
+                  const map = e || this;
+                  handleMapZoomChanged(map);
                 }}
                 options={{
                   zoomControl: true,
-                  mapTypeControl: false, // We have our custom control
+                  mapTypeControl: false,
                   streetViewControl: false,
                   fullscreenControl: true,
                   gestureHandling: "greedy",
                   disableDefaultUI: false,
                 }}
-                onLoad={() => console.log("Map loaded")} // Add this to debug
+                onLoad={(map) => {
+                  console.log("Map loaded");
+                  window.rallyMap = map;
+                }}
               >
-                {/* Current location marker with enhanced styling */}
                 <Marker
                   position={{ lat: currentGPS.lat, lng: currentGPS.lon }}
                   icon={{
@@ -2481,13 +2633,12 @@ export default function App() {
                   title="Current Location"
                 />
 
-                {/* GPS accuracy circle */}
                 {gpsAccuracy && (
                   <Circle
                     center={{ lat: currentGPS.lat, lng: currentGPS.lon }}
                     radius={gpsAccuracy}
                     options={{
-                      fillColor: isFollowingGPS ? "#4285F4" : "#FF6B35", // ← Match marker color
+                      fillColor: isFollowingGPS ? "#4285F4" : "#FF6B35",
                       fillOpacity: 0.1,
                       strokeColor: isFollowingGPS ? "#4285F4" : "#FF6B35",
                       strokeOpacity: 0.3,
@@ -2496,7 +2647,6 @@ export default function App() {
                   />
                 )}
 
-                {/* Waypoint markers with custom icons */}
                 {waypoints.map((wp, index) => {
                   if (!wp.lat || !wp.lon) {
                     console.warn(
@@ -2512,27 +2662,7 @@ export default function App() {
                       position={{ lat: wp.lat, lng: wp.lon }}
                       onClick={() => {
                         setSelectedWaypoint(index);
-                        recenterOnGPS();
                       }}
-                      icon={
-                        wp.iconSrc
-                          ? {
-                              url: wp.iconSrc,
-                              scaledSize: new google.maps.Size(40, 40),
-                              anchor: new google.maps.Point(20, 20),
-                            }
-                          : {
-                              path: google.maps.SymbolPath.CIRCLE,
-                              scale: 10,
-                              fillColor: isFollowingGPS ? "#4285F4" : "#FF6B35",
-                              fillOpacity: 1,
-                              strokeColor: "#ffffff",
-                              strokeWeight: 3,
-                            }
-                      }
-                      title={`Current Location ${
-                        isFollowingGPS ? "(Following)" : "(Free)"
-                      }`}
                       label={{
                         text: (index + 1).toString(),
                         color: "white",
@@ -2543,7 +2673,6 @@ export default function App() {
                   );
                 })}
 
-                {/* Enhanced route polyline */}
                 {routePath.length > 1 && (
                   <Polyline
                     path={routePath}
@@ -2556,7 +2685,6 @@ export default function App() {
                   />
                 )}
 
-                {/* Tracking polyline (auto-recorded GPS points) */}
                 {trackingPoints.length > 1 && (
                   <Polyline
                     path={trackingPoints.map((pt) => ({
@@ -2572,7 +2700,6 @@ export default function App() {
                   />
                 )}
 
-                {/* Enhanced info window */}
                 {selectedWaypoint !== null && waypoints[selectedWaypoint] && (
                   <InfoWindow
                     position={{
@@ -2583,13 +2710,6 @@ export default function App() {
                   >
                     <div className="p-2 max-w-xs">
                       <div className="flex items-center mb-2">
-                        {waypoints[selectedWaypoint].iconSrc && (
-                          <img
-                            src={waypoints[selectedWaypoint].iconSrc}
-                            alt={waypoints[selectedWaypoint].name}
-                            className="w-6 h-6 mr-2"
-                          />
-                        )}
                         <strong className="text-lg">
                           {waypoints[selectedWaypoint].name}
                         </strong>
@@ -2615,15 +2735,6 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      <button
-                        onClick={() => {
-                          // Future: Add edit functionality
-                          alert("Edit functionality coming soon!");
-                        }}
-                        className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-700"
-                      >
-                        Edit
-                      </button>
                     </div>
                   </InfoWindow>
                 )}
@@ -2632,22 +2743,21 @@ export default function App() {
           )}
         </div>
       )}
+
       <p></p>
 
-      {/* Route Info */}
       <div>
         <h2 className="text-lg font-semibold mb-2">
           📝 Survey Trip: Day {currentDay} - {todayDate}
         </h2>
         <div className="flex flex-wrap gap-2 mb-2">
-          {/* New Day Selector */}
           <div className="flex flex-col justify-end">
             <div className="flex items-center gap-3">
               <span className="px-3 py-2 bg-blue-100 border rounded text-center font-bold min-w-16">
                 Day {currentDay}
               </span>
               <button
-                className="bg-blue-600 text-white px-2 py-2 rounded text-sm hover:bg-blue-700"
+                className="bg-green-600 text-white px-2 py-2 rounded text-sm hover:bg-blue-700"
                 onClick={handleNewDay}
                 title="Start new day"
               >
@@ -2656,7 +2766,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* New Route Button */}
           <div className="flex flex-col justify-end">
             <button
               className="bg-brown-600 text-white px-3 py-2 rounded hover:bg-green-700 text-sm"
@@ -2667,7 +2776,6 @@ export default function App() {
             </button>
           </div>
 
-          {/* Route Name Input */}
           <div className="flex flex-col flex-1">
             <input
               className="flex-1 p-2 border rounded text-black bg-gray-100 text-sm"
@@ -2677,55 +2785,63 @@ export default function App() {
             />
           </div>
 
-          {/* Stage Input */}
           <div className="flex flex-col">
             <input
-              className="p-2 border rounded2 text-sm"
+              className="p-2 border rounded text-sm"
               placeholder="Stage Number"
               value={stageName}
-              onChange={(e) => setStageName(e.target.value)}
+              onChange={(e) => setstageName(e.target.value)}
             />
           </div>
 
-          {/* Stage Buttons */}
-          <div className="flex flex-col justify-end gap-1">
-            <button
-              className="bg-green-600 text-white px-4 py-1 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
-              onClick={() => {
-                if (waypoints.length > 0) {
-                  setShowStartstageConfirm(true);
-                } else {
-                  handleStartstage();
-                }
-              }}
-              disabled={stageLoading || !currentGPS || stageStarted}
-            >
-              {stageLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Starting...
-                </>
-              ) : (
-                <>▶️ Start Stage</>
-              )}
-            </button>
-            <button
-              className="bg-red-600 text-white px-4 py-1 rounded disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
-              onClick={() => setShowEndstageConfirm(true)}
-              disabled={!stageStarted || waypoints.length === 0}
-            >
-              ⏹ End Stage
-            </button>
+          <div className="flex flex-col justify-end">
+            {!stageStarted ? (
+              (console.log("Start Stage Debug:", {
+                stageLoading,
+                currentGPS,
+                isAuthenticated,
+              }),
+              (
+                <button
+                  className="bg-green-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+                  onClick={() => {
+                    if (!stageStarted) {
+                      // If user never tried GPS, prompt once politely
+                      if (gpsStatus === "idle" && canUseGeo) return startGPS();
+                    }
+                    if (waypoints.length > 0) {
+                      setShowStartstageConfirm(true);
+                    } else {
+                      handleStartstageClick();
+                    }
+                  }}
+                  disabled={stageLoading}
+                >
+                  {stageLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Starting...
+                    </>
+                  ) : (
+                    <>▶️ Start Stage</>
+                  )}
+                </button>
+              ))
+            ) : (
+              <button
+                className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-red-600 disabled:cursor-not-allowed text-sm"
+                onClick={() => setShowEndstageConfirm(true)}
+                disabled={waypoints.length === 0}
+              >
+                ⏹ End Stage
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Voice Instructions - Collapsible */}
-      {/* Waypoint Entry */}
       <div>
-        {/* Centered button + meter container */}
         <div className="flex justify-center items-center gap-4 my-4 flex-wrap">
-          {/* KM Display */}
           <div
             style={{
               width: "128px",
@@ -2752,8 +2868,8 @@ export default function App() {
             >
               {totalDistance.toFixed(2)} km
             </span>
-          </div>{" "}
-          {/* Add Waypoint Button */}
+          </div>
+
           <button
             onClick={handleAddWaypoint}
             type="button"
@@ -2761,7 +2877,6 @@ export default function App() {
             style={{
               padding: "18px 16px",
               borderRadius: "8px",
-              // fontWeight: "600",
               fontSize: "1.0rem",
               transition: "all 0.2s",
               display: "flex",
@@ -2780,7 +2895,7 @@ export default function App() {
           >
             {waypointAdded ? <>✅ Added!</> : <>📍 Add Waypoint</>}
           </button>
-          {/* Undo Button - When Available */}
+
           {showUndo && (
             <button
               onClick={handleUndoLastWaypoint}
@@ -2788,7 +2903,6 @@ export default function App() {
               style={{
                 padding: "18px 16px",
                 borderRadius: "8px",
-                // fontWeight: "600",
                 fontSize: "1rem",
                 backgroundColor: "#EF4444",
                 color: "white",
@@ -2803,6 +2917,7 @@ export default function App() {
               ↩️ Undo ({undoTimeLeft}s)
             </button>
           )}
+
           <button
             onClick={stageStarted ? startVoiceInput : handleGlobalVoiceCommands}
             type="button"
@@ -2810,7 +2925,6 @@ export default function App() {
             style={{
               padding: "18px 16px",
               borderRadius: "8px",
-              //fontWeight: "600",
               fontSize: "1.00rem",
               transition: "all 0.2s",
               display: "flex",
@@ -2832,12 +2946,40 @@ export default function App() {
                 <div className="w-4 h-4 bg-white rounded-full animate-pulse"></div>
                 Listening...
               </>
-            ) : stageStarted ? (
-              <>🎤 Add Location</>
             ) : (
-              <>🎤 Voice Commands</>
+              <>🎤 Add Location</>
             )}
           </button>
+
+          <button
+            onClick={
+              continuousListening
+                ? () => {
+                    if (currentRecognition) {
+                      currentRecognition.stop();
+                      setContinuousListening(false);
+                    }
+                  }
+                : startContinuousVoiceInput
+            }
+            type="button"
+            disabled={!stageStarted}
+            style={{
+              padding: "18px 16px",
+              borderRadius: "8px",
+              fontSize: "1.00rem",
+              backgroundColor: !stageStarted
+                ? "#e98547"
+                : continuousListening
+                ? "#EF4444"
+                : "#16a34a",
+              color: "white",
+              border: "2px solid #1e3a8a",
+            }}
+          >
+            {continuousListening ? "🔴 Stop Hands-Free" : "🎙️ Hands-Free Mode"}
+          </button>
+
           <button
             style={{
               padding: "18px 16px",
@@ -2854,7 +2996,7 @@ export default function App() {
           >
             📷 Photo
           </button>
-          {/* Tracking Status */}
+
           {isTracking && (
             <div className="flex items-center text-green-600 font-bold">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-ping mr-2"></div>
@@ -2862,9 +3004,7 @@ export default function App() {
             </div>
           )}
         </div>
-        {/* Waypoints List */}
 
-        {/* Two-Column Layout using Inline Styles */}
         <div
           style={{
             display: "flex",
@@ -2873,7 +3013,6 @@ export default function App() {
             marginTop: "24px",
           }}
         >
-          {/* LEFT COLUMN: Current Stage Waypoints */}
           <div style={{ flex: 1 }}>
             <div
               style={{
@@ -2949,7 +3088,6 @@ export default function App() {
                 >
                   {waypoints.map((wp, idx) => (
                     <div key={idx} className="bg-gray-100 p-3 rounded">
-                      {/* Add checkbox for bulk selection */}
                       {bulkSelectMode && (
                         <div
                           style={{
@@ -2978,16 +3116,6 @@ export default function App() {
                           marginBottom: "8px",
                         }}
                       >
-                        {/* Only show icon if waypoint has an iconSrc */}
-                        {wp.iconSrc && (
-                          <img
-                            src={wp.iconSrc}
-                            className="w-6 h-6"
-                            alt={wp.name}
-                            style={{ marginRight: "8px" }}
-                          />
-                        )}
-                        {/* Show voice indicator for voice-created waypoints, icon for manual ones */}
                         {wp.voiceCreated ? (
                           <div
                             style={{
@@ -3001,13 +3129,6 @@ export default function App() {
                           >
                             <span className="text-blue-500">🎤</span>
                           </div>
-                        ) : wp.iconSrc ? (
-                          <img
-                            src={wp.iconSrc}
-                            className="w-6 h-6"
-                            alt={wp.name}
-                            style={{ marginRight: "8px" }}
-                          />
                         ) : (
                           <div
                             style={{
@@ -3107,7 +3228,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Stage Summaries */}
           <div style={{ flex: 1 }}>
             <div
               style={{
@@ -3115,7 +3235,7 @@ export default function App() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 marginBottom: "8px",
-                minHeight: "32px", // ← SAME HEIGHT as left column
+                minHeight: "32px",
               }}
             >
               <h2 className="text-lg font-semibold">📋 Stage Summaries</h2>
@@ -3169,6 +3289,20 @@ export default function App() {
           </div>
         </div>
       </div>
+      {showProfile && user !== "guest" && (
+        <UserProfile user={user} onClose={() => setShowProfile(false)} />
+      )}
     </div>
+  );
+}
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/auth/reset-password" element={<ResetPassword />} />
+      </Routes>
+    </BrowserRouter>
   );
 }

@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<gpx version="1.1" creator="Rally Mapper">
+
+<wpt lat="-35.03321482356183" lon="138.7469429593972">
+  <name>Keep straight</name>
+  <desc>Boulders on the left</desc>
+  <time>2025-05-27T05:31:21.425Z</time>
+</wpt>
+
+<wpt lat="-35.034223780257946" lon="138.74757508458012">
+  <name>Warning</name>
+  <desc>Mud slides</desc>
+  <time>2025-05-27T05:31:21.426Z</time>
+</wpt>
+
+<wpt lat="-35.034344003175356" lon="138.7461582893477">
+  <name>Right</name>
+  <desc></desc>
+  <time>2025-05-27T05:31:21.426Z</time>
+</wpt>
+
+<wpt lat="-35.03255470525639" lon="138.74426728691338">
+  <name>Right</name>
+  <desc></desc>
+  <time>2025-05-27T05:31:21.426Z</time>
+</wpt>
+
+</gpx>

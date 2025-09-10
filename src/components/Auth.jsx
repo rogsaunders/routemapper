@@ -1,221 +1,229 @@
-// Updated Auth component (components/Auth.jsx) with improved UI
-
+// Auth.jsx — robust email/password auth with reset & guest mode
 import React, { useState } from "react";
 import { supabase } from "../lib/supabase";
 
-const Auth = ({ onAuthSuccess }) => {
+export default function Auth({ onAuthSuccess, onGuest }) {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
-  const [isResetPassword, setIsResetPassword] = useState(false);
+  const [isReset, setIsReset] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [showPw, setShowPw] = useState(false);
+
+  const resetAlerts = () => {
+    setMessage("");
+    setError("");
+  };
 
   const handleAuth = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
-    setMessage("");
+    resetAlerts();
+
+    const emailTrimmed = email.trim();
+
+    if (!emailTrimmed) {
+      setError("Please enter your email.");
+      return;
+    }
+    if (!isReset && password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
 
     try {
-      if (isResetPassword) {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth/reset-password`,
-        });
+      setLoading(true);
+
+      if (isReset) {
+        const { error } = await supabase.auth.resetPasswordForEmail(
+          emailTrimmed,
+          {
+            redirectTo: window.location.origin + "/auth/callback",
+          }
+        );
         if (error) throw error;
-        setMessage("Check your email for the password reset link!");
-      } else if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
-          email,
+        setMessage("Password reset email sent. Check your inbox.");
+        return;
+      }
+
+      if (isSignUp) {
+        const { data, error } = await supabase.auth.signUp({
+          email: emailTrimmed,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: window.location.origin + "/auth/callback",
           },
         });
         if (error) throw error;
-        setMessage("Check your email for the confirmation link!");
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        if (onAuthSuccess) onAuthSuccess();
+        setMessage(
+          data?.user?.identities?.length
+            ? "Sign-up successful. Please check your email to confirm your account."
+            : "If this email is new, check your inbox to confirm your account."
+        );
+        return;
       }
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const signInAsGuest = async () => {
-    setLoading(true);
-    try {
-      localStorage.setItem("guestMode", "true");
-      if (onAuthSuccess) onAuthSuccess("guest");
-    } catch (error) {
-      setError("Failed to enter guest mode");
+      // Sign in (password grant)
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailTrimmed,
+        password,
+      });
+      if (error) throw error;
+
+      // success
+      setMessage("Signed in successfully.");
+      onAuthSuccess?.(data?.user ?? data?.session?.user ?? null);
+    } catch (err) {
+      // Surface clear messages for common 400s
+      const raw = err?.message || "Authentication failed.";
+      let friendly = raw;
+      if (/invalid login credentials/i.test(raw))
+        friendly = "Invalid email or password.";
+      if (/email not confirmed/i.test(raw))
+        friendly = "Email not confirmed. Please check your inbox.";
+      setError(friendly);
+      console.error("Supabase auth error:", err);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center">
-            <img
-              src="/RRM Logo 64x64.png"
-              className="h-12 w-12"
-              alt="Rally Route Mapper"
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+      <div className="w-full max-w-md bg-white rounded-xl shadow-md p-6">
+        <h1 className="text-2xl font-semibold mb-1 text-gray-900">
+          {isReset ? "Reset Password" : isSignUp ? "Create Account" : "Sign In"}
+        </h1>
+        <p className="text-sm text-gray-500 mb-6">
+          {isReset
+            ? "Enter your email and we’ll send you a reset link."
+            : isSignUp
+            ? "Create your Rally Mapper account."
+            : "Sign in to continue to Rally Mapper."}
+        </p>
+
+        {message && (
+          <div className="mb-3 rounded-md bg-green-50 text-green-800 border border-green-200 px-3 py-2 text-sm">
+            {message}
+          </div>
+        )}
+        {error && (
+          <div className="mb-3 rounded-md bg-red-50 text-red-800 border border-red-200 px-3 py-2 text-sm">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleAuth} className="space-y-4">
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="you@example.com"
+              required
             />
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Rally Route Mapper
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            {isResetPassword
-              ? "Reset your password"
-              : isSignUp
-              ? "Create your account"
-              : "Sign in to your account"}
-          </p>
-        </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleAuth}>
-          <div className="rounded-md shadow-sm space-y-4">
+          {!isReset && (
             <div>
               <label
-                htmlFor="email"
+                htmlFor="password"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Email Address
+                Password
               </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-
-            {!isResetPassword && (
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Password
-                </label>
+              <div className="relative">
                 <input
                   id="password"
-                  name="password"
-                  type="password"
+                  type={showPw ? "text" : "password"}
                   autoComplete={isSignUp ? "new-password" : "current-password"}
-                  required
-                  className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder={
+                    isSignUp ? "Create a password" : "Enter your password"
+                  }
+                  required
+                  minLength={6}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPw((s) => !s)}
+                  className="absolute inset-y-0 right-0 px-3 text-sm text-gray-500 hover:text-gray-700"
+                  aria-label={showPw ? "Hide password" : "Show password"}
+                >
+                  {showPw ? "Hide" : "Show"}
+                </button>
               </div>
-            )}
-          </div>
-
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
             </div>
           )}
 
-          {message && (
-            <div className="rounded-md bg-green-50 p-4">
-              <div className="text-sm text-green-700">{message}</div>
-            </div>
-          )}
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full rounded-md px-3 py-2 text-white font-medium ${
+              loading
+                ? "bg-blue-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
+          >
+            {loading
+              ? "Please wait…"
+              : isReset
+              ? "Send Reset Link"
+              : isSignUp
+              ? "Create Account"
+              : "Sign In"}
+          </button>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {loading ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              ) : isResetPassword ? (
-                "Send Reset Email"
-              ) : isSignUp ? (
-                "Sign Up"
-              ) : (
-                "Sign In"
-              )}
-            </button>
-          </div>
-
-          {/* Fixed layout for forgot password and need account buttons */}
-          <div className="space-y-5">
-            <div className="text-left">
+          <div className="flex items-center justify-between text-sm">
+            {!isReset && (
               <button
                 type="button"
                 onClick={() => {
-                  setIsResetPassword(!isResetPassword);
-                  setIsSignUp(false);
-                  setError("");
-                  setMessage("");
+                  resetAlerts();
+                  setIsSignUp((s) => !s);
                 }}
-                className="font-medium text-blue-600 hover:text-blue-500 text-sm"
+                className="text-blue-700 hover:underline"
               >
-                {isResetPassword ? "Back to sign in" : "Forgot your password?"}
+                {isSignUp
+                  ? "Have an account? Sign in"
+                  : "New here? Create an account"}
               </button>
-            </div>
-
-            {!isResetPassword && (
-              <div className="text-left">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSignUp(!isSignUp);
-                    setIsResetPassword(false);
-                    setError("");
-                    setMessage("");
-                  }}
-                  className="font-medium text-blue-600 hover:text-blue-500 text-sm"
-                >
-                  {isSignUp ? "Already have an account?" : "Need an account?"}
-                </button>
-              </div>
             )}
+            <button
+              type="button"
+              onClick={() => {
+                resetAlerts();
+                setIsReset((r) => !r);
+              }}
+              className="text-gray-600 hover:underline ml-auto"
+            >
+              {isReset ? "Back to sign in" : "Forgot password?"}
+            </button>
           </div>
 
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gray-50 text-gray-500">Or</span>
-              </div>
-            </div>
-
-            <div className="mt-6">
+          <div className="pt-2">
+            <div className="flex flex-col gap-2">
               <button
                 type="button"
-                onClick={signInAsGuest}
-                disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                onClick={() => onGuest?.()}
+                className="w-full rounded-md px-3 py-2 font-medium border border-gray-300 hover:bg-gray-50"
               >
                 Continue as Guest
               </button>
-              <p className="mt-2 text-xs text-gray-500 text-center">
-                Guest mode: Data saved locally only, no cloud sync
+              <p className="text-xs text-gray-500 text-center">
+                Guest mode: data is stored locally and won’t sync to cloud.
               </p>
             </div>
           </div>
@@ -223,6 +231,4 @@ const Auth = ({ onAuthSuccess }) => {
       </div>
     </div>
   );
-};
-
-export default Auth;
+}

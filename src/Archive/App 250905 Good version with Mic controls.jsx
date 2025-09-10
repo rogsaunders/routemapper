@@ -56,177 +56,6 @@ function calculateCumulativeDistance(waypoints, currentLat, currentLon) {
   return parseFloat(totalDistance.toFixed(2));
 }
 
-const UserProfile = ({ user, onClose, onAccountDeleted }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState({
-    displayName: user?.user_metadata?.full_name || "",
-    email: user?.email || "",
-  });
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  const handleUpdateProfile = async () => {
-    setLoading(true);
-    setMessage("");
-    try {
-      const { error } = await supabase.auth.updateUser({
-        data: { full_name: profile.displayName },
-      });
-      if (error) throw error;
-      setMessage("Profile updated successfully!");
-      setIsEditing(false);
-    } catch (error) {
-      setMessage(`Error: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChangePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      setMessage("Passwords do not match");
-      return;
-    }
-    if (newPassword.length < 6) {
-      setMessage("Password must be at least 6 characters");
-      return;
-    }
-    setLoading(true);
-    setMessage("");
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (error) throw error;
-      setMessage("Password changed successfully!");
-      setNewPassword("");
-      setConfirmPassword("");
-    } catch (error) {
-      setMessage(`Error: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">User Profile</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            ✕
-          </button>
-        </div>
-
-        {message && (
-          <div
-            className={`p-3 rounded mb-4 ${
-              message.includes("Error")
-                ? "bg-red-100 text-red-700"
-                : "bg-green-100 text-green-700"
-            }`}
-          >
-            {message}
-          </div>
-        )}
-
-        {/* Profile Section */}
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3">Profile Information</h3>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Display Name
-              </label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={profile.displayName}
-                  onChange={(e) =>
-                    setProfile((prev) => ({
-                      ...prev,
-                      displayName: e.target.value,
-                    }))
-                  }
-                  className="w-full p-2 border rounded"
-                />
-              ) : (
-                <p className="p-2 bg-gray-50 rounded">
-                  {profile.displayName || "Not set"}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
-              <p className="p-2 bg-gray-50 rounded">{profile.email}</p>
-            </div>
-            <div className="flex gap-2">
-              {isEditing ? (
-                <>
-                  <button
-                    onClick={handleUpdateProfile}
-                    disabled={loading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {loading ? "Updating..." : "Save Changes"}
-                  </button>
-                  <button
-                    onClick={() => setIsEditing(false)}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                  >
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-                >
-                  Edit Profile
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Password Change Section */}
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3">Change Password</h3>
-          <div className="space-y-3">
-            <input
-              type="password"
-              placeholder="New Password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-            <input
-              type="password"
-              placeholder="Confirm New Password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-            <button
-              onClick={handleChangePassword}
-              disabled={loading || !newPassword || !confirmPassword}
-              className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-            >
-              {loading ? "Changing..." : "Change Password"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 function mapCategoryToStandardIcon(category, description) {
   const text = description.toLowerCase();
 
@@ -458,25 +287,70 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
   return gpxHeader + waypointEntries + routestage + trackingSegment + gpxFooter;
 }
 
-function buildKML(routeWaypoints = [], trackingPoints = [], name = "Route") {
+function buildKML(waypoints = [], trackingPoints = [], name = "Route") {
   const kmlHeader = `<?xml version="1.0" encoding="UTF-8"?>
-  <kml xmlns="http://www.opengis.net/kml/2.2">`;
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${name}</name>
+    <description>Rally route - ${waypoints.length} waypoints</description>
+    
+    <!-- Waypoint Folder -->
+    <Folder>
+      <name>Waypoints</name>
+      <description>Rally waypoints</description>`;
 
-  const placemarks = routeWaypoints
+  // Individual waypoint placemarks
+  const waypointPlacemarks = waypoints
     .map(
-      (wp, i) => `
-        <Placemark>
-          <name>${wp.name || "WP " + (i + 1)}</name>
-          <description>${wp.description || ""}</description>
-          <Point>
-            <coordinates>${wp.lon},${wp.lat},0</coordinates>
-          </Point>
-        </Placemark>`
+      (wp, index) => `
+      <Placemark>
+        <name>WP${(index + 1).toString().padStart(2, "0")} ${wp.name}</name>
+        <description>${wp.name} - ${wp.distance}km${
+        wp.voiceCreated ? " (Voice)" : ""
+      }</description>
+        <Point>
+          <coordinates>${wp.lon},${wp.lat},0</coordinates>
+        </Point>
+      </Placemark>`
     )
     .join("");
 
-  const kmlFooter = `</kml>`;
-  return `${kmlHeader}<Document><name>${name}</name>${placemarks}</Document>${kmlFooter}`;
+  const waypointFolderClose = `
+    </Folder>`;
+
+  // Tracking folder
+  const trackingFolder =
+    trackingPoints.length > 0
+      ? `
+    <Folder>
+      <name>GPS Track</name>
+      <description>Auto-recorded GPS track</description>
+      <Placemark>
+        <name>${name} Track</name>
+        <description>GPS breadcrumbs - ${
+          trackingPoints.length
+        } points</description>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            ${trackingPoints
+              .map((pt) => `${pt.lon},${pt.lat},0`)
+              .join("\n            ")}
+          </coordinates>
+        </LineString>
+      </Placemark>
+    </Folder>`
+      : "";
+
+  return (
+    kmlHeader +
+    waypointPlacemarks +
+    waypointFolderClose +
+    trackingFolder +
+    `
+  </Document>
+</kml>`
+  );
 }
 
 const exportFileIPadCompatible = async (
@@ -598,10 +472,7 @@ const exportFileIPadCompatible = async (
 
 const libraries = []; // declared outside the component or at top level
 
-
-  const [syncStatus, setSyncStatus] = useState(
-    isGuestMode ? "offline" : "online"
-  );
+function Home() {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: "AIzaSyCYZchsHu_Sd4KMNP1b6Dq30XzWWOuFPO8",
     libraries,
@@ -651,41 +522,26 @@ const libraries = []; // declared outside the component or at top level
   const [staticMapCenter, setStaticMapCenter] = useState(null);
   const [userHasInteractedWithMap, setUserHasInteractedWithMap] =
     useState(false);
+  const [user, setUser] = useState(null);
+  const [syncStatus, setSyncStatus] = useState("offline");
   const [continuousListening, setContinuousListening] = useState(false);
-  const [showUserProfile, setShowUserProfile] = useState(false);
-  
 
-  
-  const handleSignOut = async () => {
-    try {
-      if (user !== "guest") {
-        await supabase.auth.signOut();
-      } else {
-        // For guest mode, you might want to reload the page or redirect
-        localStorage.removeItem("guestMode");
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error("Sign out error:", error);
-    }
-  };
-
-  // Add this useEffect to set initial sync status
+  // Auth status check
   useEffect(() => {
-    if (user === "guest" || isGuestMode) {
-      setSyncStatus("offline");
-    } else if (user) {
-      setSyncStatus("online");
-    }
-  }, [user, isGuestMode]);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setSyncStatus(session ? "online" : "offline");
+    });
 
-  useEffect(() => {
-    if (user === "guest" || isGuestMode) {
-      setSyncStatus("offline");
-    } else if (user) {
-      setSyncStatus("online");
-    }
-  }, [user, isGuestMode]);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setSyncStatus(session ? "online" : "offline");
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Auto-save to Supabase
   useEffect(() => {
@@ -749,7 +605,7 @@ const libraries = []; // declared outside the component or at top level
     };
 
     const handleError = (err) => {
-      console.error("⌐ GPS error", err);
+      console.error("❌ GPS error", err);
       setGpsLoading(false);
 
       switch (err.code) {
@@ -1642,7 +1498,7 @@ const libraries = []; // declared outside the component or at top level
       >
         {continuousListening ? (
           <>
-            <div className="w-3 h-4 bg-white rounded-full animate-pulse"></div>
+            <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
             🔴 Mic Off
           </>
         ) : (
@@ -2641,55 +2497,35 @@ const libraries = []; // declared outside the component or at top level
 
   return (
     <div className="p-4">
-      {showUserProfile && (
-        <UserProfile
-          user={user}
-          onClose={() => setShowUserProfile(false)}
-          onAccountDeleted={() => {
-            setUser(null);
-            setIsGuestMode(false);
-          }}
-        />
-      )}
-
       {/* Sync Status Indicator */}
       <div className="fixed top-4 right-4 z-50">
-        <div className="flex flex-col items-end gap-2">
-          <div
-            className={`px-3 py-1 rounded-full text-sm flex items-center gap-2 ${
-              syncStatus === "synced"
-                ? "bg-green-100 text-green-800"
-                : syncStatus === "syncing"
-                ? "bg-yellow-100 text-yellow-800"
-                : syncStatus === "error"
-                ? "bg-red-100 text-red-800"
-                : "bg-gray-100 text-gray-800"
-            }`}
-          >
-            {syncStatus === "synced" && "☁️ Saved"}
-            {syncStatus === "syncing" && "🔄 Syncing..."}
-            {syncStatus === "error" && "⚠️ Sync Error"}
-            {syncStatus === "offline" &&
-              (isGuestMode ? "🔒 Guest Mode" : "💾 Local Only")}
-          </div>
-
-          <div className="flex gap-2">
-            {user && user !== "guest" && (
-              <button
-                onClick={() => setShowUserProfile(true)}
-                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
-              >
-                👤 {user.email?.split("@")[0] || "User"}
-              </button>
-            )}
-            <button
-              onClick={handleSignOut}
-              className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
-            >
-              {user === "guest" ? "Exit Guest" : "Sign Out"}
-            </button>
-          </div>
+        <div
+          className={`px-3 py-1 rounded-full text-sm ${
+            syncStatus === "synced"
+              ? "bg-green-100 text-green-800"
+              : syncStatus === "syncing"
+              ? "bg-yellow-100 text-yellow-800"
+              : syncStatus === "error"
+              ? "bg-red-100 text-red-800"
+              : "bg-gray-100 text-gray-800"
+          }`}
+        >
+          {syncStatus === "synced"
+            ? "☁️ Saved"
+            : syncStatus === "syncing"
+            ? "🔄 Syncing..."
+            : syncStatus === "error"
+            ? "⚠️ Sync Error"
+            : "💾 Local Only"}
         </div>
+        {user !== "guest" && (
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="mt-2 text-xs text-gray-500 hover:text-gray-700"
+          >
+            Sign Out
+          </button>
+        )}
       </div>
 
       <WaypointSuccessNotification />
@@ -3411,17 +3247,10 @@ const libraries = []; // declared outside the component or at top level
   );
 }
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [isGuestMode, setIsGuestMode] = useState(false);
-  
   return (
     <BrowserRouter>
       <Routes>
-        <Route
-          path="/"
-          element={<Home user={user} isGuestMode={isGuestMode} />}
-        />
+        <Route path="/" element={<Home />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
       </Routes>
     </BrowserRouter>

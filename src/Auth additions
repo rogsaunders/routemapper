@@ -1,0 +1,425 @@
+I cannot create GitHub Gists or external links as I don't have the ability to create content on external platforms or generate actual URLs.
+Let me go with Option 4 - Key Changes Only. This will be much more practical and manageable. I'll provide you with the specific authentication components and modifications you need to add to your existing App.jsx file.
+Authentication Integration Guide
+Here are the key additions you need to make to your existing App.jsx file:
+1. Add New Imports (at the top of your file)
+javascript// Add these to your existing imports
+import { supabase } from "./lib/supabase";
+import { dataSync } from "./services/dataSync";
+2. Add Authentication Components (before your Home function)
+javascript/
+
+// Enhanced User Profile Component
+const UserProfile = ({ user, onClose, onAccountDeleted }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [profile, setProfile] = useState({
+    displayName: user?.user_metadata?.full_name || '',
+    email: user?.email || '',
+  });
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleUpdateProfile = async () => {
+    setLoading(true);
+    setMessage('');
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { full_name: profile.displayName }
+      });
+      if (error) throw error;
+      setMessage('Profile updated successfully!');
+      setIsEditing(false);
+    } catch (error) {
+      setMessage(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      setMessage('Passwords do not match');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setMessage('Password must be at least 6 characters');
+      return;
+    }
+    setLoading(true);
+    setMessage('');
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setMessage('Password changed successfully!');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      setMessage(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">User Profile</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+        </div>
+
+        {message && (
+          <div className={`p-3 rounded mb-4 ${
+            message.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+          }`}>
+            {message}
+          </div>
+        )}
+
+        {/* Profile Section */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3">Profile Information</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">Display Name</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={profile.displayName}
+                  onChange={(e) => setProfile(prev => ({ ...prev, displayName: e.target.value }))}
+                  className="w-full p-2 border rounded"
+                />
+              ) : (
+                <p className="p-2 bg-gray-50 rounded">{profile.displayName || 'Not set'}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Email</label>
+              <p className="p-2 bg-gray-50 rounded">{profile.email}</p>
+            </div>
+            <div className="flex gap-2">
+              {isEditing ? (
+                <>
+                  <button onClick={handleUpdateProfile} disabled={loading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+                    {loading ? 'Updating...' : 'Save Changes'}
+                  </button>
+                  <button onClick={() => setIsEditing(false)}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => setIsEditing(true)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">
+                  Edit Profile
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Password Change Section */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3">Change Password</h3>
+          <div className="space-y-3">
+            <input type="password" placeholder="New Password" value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)} className="w-full p-2 border rounded" />
+            <input type="password" placeholder="Confirm New Password" value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)} className="w-full p-2 border rounded" />
+            <button onClick={handleChangePassword} disabled={loading || !newPassword || !confirmPassword}
+              className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+              {loading ? 'Changing...' : 'Change Password'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Enhanced Authentication Component
+const AuthenticationModal = ({ isOpen, onClose, onAuthSuccess }) => {
+  const [mode, setMode] = useState('signin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const resetForm = () => {
+    setEmail(''); setPassword(''); setConfirmPassword(''); setDisplayName(''); setMessage('');
+  };
+
+  const handleSignUp = async () => {
+    if (password !== confirmPassword) {
+      setMessage('Passwords do not match'); return;
+    }
+    if (password.length < 6) {
+      setMessage('Password must be at least 6 characters'); return;
+    }
+    setLoading(true); setMessage('');
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email, password, options: { data: { full_name: displayName } }
+      });
+      if (error) throw error;
+      if (data.user && !data.session) {
+        setMessage('Please check your email for the verification link!');
+        setMode('verify');
+      } else {
+        onAuthSuccess(data.user); onClose();
+      }
+    } catch (error) {
+      setMessage(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignIn = async () => {
+    setLoading(true); setMessage('');
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      onAuthSuccess(data.user); onClose();
+    } catch (error) {
+      setMessage(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true); setMessage('');
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/auth/callback` }
+      });
+      if (error) throw error;
+    } catch (error) {
+      setMessage(`Error: ${error.message}`); setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">
+            {mode === 'signin' && 'Sign In'}
+            {mode === 'signup' && 'Create Account'}
+            {mode === 'verify' && 'Check Your Email'}
+          </h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+        </div>
+
+        {message && (
+          <div className={`p-3 rounded mb-4 ${
+            message.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+          }`}>
+            {message}
+          </div>
+        )}
+
+        {mode === 'verify' ? (
+          <div className="text-center">
+            <p className="mb-4">We've sent you a verification email. Please check your inbox.</p>
+            <button onClick={() => { setMode('signin'); resetForm(); }}
+              className="text-blue-600 hover:text-blue-800">Back to Sign In</button>
+          </div>
+        ) : (
+          <>
+            <button onClick={handleGoogleSignIn} disabled={loading}
+              className="w-full py-2 px-4 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 flex items-center justify-center gap-2 mb-4 disabled:opacity-50">
+              {loading ? 'Signing in...' : 'Continue with Google'}
+            </button>
+
+            <div className="relative mb-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">or</span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {mode === 'signup' && (
+                <input type="text" placeholder="Display Name" value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg" />
+              )}
+              <input type="email" placeholder="Email" value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg" />
+              <input type="password" placeholder="Password" value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg" />
+              {mode === 'signup' && (
+                <input type="password" placeholder="Confirm Password" value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg" />
+              )}
+              <button onClick={mode === 'signin' ? handleSignIn : handleSignUp} disabled={loading}
+                className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                {loading ? 'Processing...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+              </button>
+            </div>
+
+            <div className="mt-4 text-center">
+              {mode === 'signin' ? (
+                <button onClick={() => { setMode('signup'); resetForm(); }}
+                  className="text-blue-600 hover:text-blue-800">
+                  Don't have an account? Sign up
+                </button>
+              ) : (
+                <button onClick={() => { setMode('signin'); resetForm(); }}
+                  className="text-blue-600 hover:text-blue-800">
+                  Already have an account? Sign in
+                </button>
+              )}
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-gray-300">
+              <button onClick={() => { onAuthSuccess('guest'); onClose(); }}
+                className="w-full py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                Continue as Guest
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+3. Add New State Variables (in your Home function)
+javascript// Add these to your existing useState declarations
+const [authLoading, setAuthLoading] = useState(true);
+const [showAuthModal, setShowAuthModal] = useState(false);
+const [showUserProfile, setShowUserProfile] = useState(false);
+const [isGuestMode, setIsGuestMode] = useState(false);
+4. Replace Your Auth useEffect
+Replace your existing auth useEffect with this enhanced version:
+javascript// Enhanced Auth status check
+useEffect(() => {
+  const initializeAuth = async () => {
+    setAuthLoading(true);
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Session error:', error);
+        setUser(null); setSyncStatus("offline");
+      } else if (session?.user) {
+        setUser(session.user); setSyncStatus("online"); setIsGuestMode(false);
+      } else {
+        const guestPreference = localStorage.getItem("guestMode");
+        if (guestPreference === "true") {
+          setUser("guest"); setIsGuestMode(true); setSyncStatus("offline");
+        } else {
+          setUser(null); setSyncStatus("offline");
+        }
+      }
+    } catch (error) {
+      console.error('Auth initialization error:', error);
+      setUser(null); setSyncStatus("offline");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  initializeAuth();
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session?.user) {
+      setUser(session.user); setSyncStatus("online"); setIsGuestMode(false);
+      localStorage.removeItem("guestMode");
+    } else if (event === 'SIGNED_OUT') {
+      setUser(null); setSyncStatus("offline"); setIsGuestMode(false);
+      localStorage.removeItem("guestMode");
+    }
+  });
+
+  return () => subscription.unsubscribe();
+}, []);
+
+// Add this new useEffect for showing auth modal
+useEffect(() => {
+  if (!authLoading && !user && !isGuestMode) {
+    setShowAuthModal(true);
+  }
+}, [authLoading, user, isGuestMode]);
+
+5. Add Handler Functions
+javascript
+const handleAuthSuccess = (userData) => {
+  if (userData === 'guest') {
+    setUser('guest'); setIsGuestMode(true); setSyncStatus("offline");
+    localStorage.setItem("guestMode", "true");
+  } else {
+    setUser(userData); setIsGuestMode(false); setSyncStatus("online");
+    localStorage.removeItem("guestMode");
+  }
+  setShowAuthModal(false);
+};
+
+const handleSignOut = async () => {
+  try {
+    if (user !== 'guest') {
+      await supabase.auth.signOut();
+    } else {
+      setUser(null); setIsGuestMode(false); localStorage.removeItem("guestMode");
+    }
+    setSyncStatus("offline");
+  } catch (error) {
+    console.error('Sign out error:', error);
+  }
+};
+6. Update Your Sync Status Indicator
+Replace your existing sync status with this enhanced version:
+javascript
+
+// Add this component in your return statement
+<div className="fixed top-4 right-4 z-50">
+  <div className="flex flex-col items-end gap-2">
+    <div className={`px-3 py-1 rounded-full text-sm flex items-center gap-2 ${
+      syncStatus === "synced" ? "bg-green-100 text-green-800" :
+      syncStatus === "syncing" ? "bg-yellow-100 text-yellow-800" :
+      syncStatus === "error" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"
+    }`}>
+      {syncStatus === "synced" && "☁️ Saved"}
+      {syncStatus === "syncing" && "🔄 Syncing..."}
+      {syncStatus === "error" && "⚠️ Sync Error"}
+      {syncStatus === "offline" && (isGuestMode ? "🔒 Guest Mode" : "💾 Local Only")}
+    </div>
+    
+    <div className="flex gap-2">
+      {user && user !== "guest" && (
+        <button onClick={() => setShowUserProfile(true)}
+          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">
+          👤 {user.email?.split('@')[0] || 'User'}
+        </button>
+      )}
+      <button onClick={handleSignOut}
+        className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100">
+        {user === 'guest' ? 'Exit Guest' : 'Sign Out'}
+      </button>
+    </div>
+  </div>
+</div>
+
+{/* Add these modals to your JSX */}
+{showUserProfile && (
+  <UserProfile user={user} onClose={() => setShowUserProfile(false)} 
+    onAccountDeleted={() => { setUser(null); setIsGuestMode(false); }} />
+)}
+
+<AuthenticationModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} 
+  onAuthSuccess={handleAuthSuccess} />

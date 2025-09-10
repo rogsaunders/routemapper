@@ -1,72 +1,21 @@
-import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
+import {
+  GoogleMap,
+  Marker,
+  InfoWindow,
+  Polyline,
+  Circle,
+  useJsApiLoader,
+} from "@react-google-maps/api";
 import startSound from "./assets/sounds/start.wav";
 import stopSound from "./assets/sounds/stop.wav";
 import JSZip from "jszip";
 import React, { useEffect, useRef, useState } from "react";
-// ... other imports remain unchanged
-
-// Icon categories (merged cleanly)
-const iconCategories = {
-  Abbreviations: [
-    { name: "Left", src: "/icons/left.svg" },
-    { name: "Right", src: "/icons/right.svg" },
-    { name: "Left and Right", src: "/icons/left_and_right.svg" },
-    { name: "Right and Left", src: "/icons/right_and_left.svg" },
-    { name: "Keep to the left", src: "/icons/keep-left.svg" },
-    { name: "Keep to the right", src: "/icons/keep-right.svg" },
-    { name: "Keep straight", src: "/icons/keep-straight.svg" },
-    { name: "On Left", src: "/icons/on-left.svg" },
-    { name: "On Right", src: "/icons/on-right.svg" },
-    { name: "Bad", src: "/icons/bad.svg" },
-  ],
-  "On Track": [
-    { name: "Bump", src: "/icons/bump.svg" },
-    { name: "Bumpy", src: "/icons/bumpy.svg" },
-    { name: "Bumpy Broken", src: "/icons/bumpy_broken.svg" },
-    { name: "Dip Hole", src: "/icons/dip-hole.svg" },
-    { name: "Ditch", src: "/icons/ditch.svg" },
-    { name: "Summit", src: "/icons/summit.svg" },
-    { name: "Hole", src: "/icons/hole.svg" },
-    { name: "Up hill", src: "/icons/uphill.svg" },
-    { name: "Down hill", src: "/icons/downhill.svg" },
-    { name: "Fence gate", src: "/icons/fence-gate.svg" },
-    { name: "Water crossing", src: "/icons/wading.svg" },
-    { name: "Grid", src: "/icons/grid.svg" },
-    { name: "Fence", src: "/icons/fence.svg" },
-    { name: "Rail road", src: "/icons/railroad.svg" },
-    { name: "Twisty", src: "/icons/twisty.svg" },
-    { name: "Tree", src: "/icons/tree_5.svg" },
-    { name: "Petrol Station", src: "/icons/petrol_station.svg" },
-  ],
-
-  Controls: [
-    { name: "Stop for Restart", src: "/icons/stop_for_restart.svg" },
-    {
-      name: "Arrive Selective Section",
-      src: "/icons/arrive_selective_section_flag.svg",
-    },
-  ],
-  Safety: [
-    { name: "Danger 1", src: "/icons/danger-1.svg" },
-    { name: "Danger 2", src: "/icons/danger-2.svg" },
-    { name: "Danger 3", src: "/icons/danger-3.svg" },
-    { name: "Stop", src: "/icons/stop.svg" },
-    { name: "Caution", src: "/icons/caution.svg" },
-  ],
-};
-
-// Flattened icon array for easier searching
-const allIcons = Object.values(iconCategories).flat();
-
-function RecenterMapToStart({ lat, lon }) {
-  const map = useMap();
-  useEffect(() => {
-    if (lat && lon) {
-      map.setView([lat, lon], 14);
-    }
-  }, [lat, lon]);
-  return null;
-}
+import ReplayRoute from "./ReplayRoute";
+import { supabase } from "./lib/supabase";
+import { dataSync } from "./services/dataSync";
+import Auth from "./components/Auth";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import AuthCallback from "./routes/AuthCallback";
 
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -80,37 +29,251 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2);
 }
 
+// Calculate cumulative distance from stage start
+function calculateCumulativeDistance(waypoints, currentLat, currentLon) {
+  if (waypoints.length === 0) return 0;
+
+  let totalDistance = 0;
+  let prevLat = waypoints[0].lat;
+  let prevLon = waypoints[0].lon;
+
+  // Sum distances between all previous waypoints
+  for (let i = 1; i < waypoints.length; i++) {
+    totalDistance += parseFloat(
+      calculateDistance(prevLat, prevLon, waypoints[i].lat, waypoints[i].lon)
+    );
+    prevLat = waypoints[i].lat;
+    prevLon = waypoints[i].lon;
+  }
+
+  // Add distance from last waypoint to current position
+  if (waypoints.length > 0) {
+    totalDistance += parseFloat(
+      calculateDistance(prevLat, prevLon, currentLat, currentLon)
+    );
+  }
+
+  return parseFloat(totalDistance.toFixed(2));
+}
+
+function mapCategoryToStandardIcon(category, description) {
+  const text = description.toLowerCase();
+
+  // Map categories and keywords to standard rally icons
+  const iconMapping = {
+    safety: {
+      icon: "danger",
+      gpxType: "danger",
+      priority:
+        text.includes("severe") || text.includes("extreme") ? "high" : "medium",
+    },
+    navigation: {
+      icon: text.includes("left")
+        ? "left"
+        : text.includes("right")
+        ? "right"
+        : text.includes("straight")
+        ? "straight"
+        : "navigation",
+      gpxType: "turn",
+      priority: "high",
+    },
+    surface: {
+      icon: text.includes("bump")
+        ? "bump"
+        : text.includes("hole")
+        ? "hole"
+        : text.includes("rough")
+        ? "bumpy"
+        : "surface",
+      gpxType: "hazard",
+      priority: "medium",
+    },
+    obstacle: {
+      icon:
+        text.includes("grid") || text.includes("cattle")
+          ? "grid"
+          : text.includes("gate")
+          ? "fence-gate"
+          : "obstacle",
+      gpxType: "waypoint",
+      priority: "medium",
+    },
+    elevation: {
+      icon:
+        text.includes("summit") || text.includes("peak")
+          ? "summit"
+          : text.includes("hill")
+          ? "uphill"
+          : "elevation",
+      gpxType: "summit",
+      priority: "low",
+    },
+    crossing: {
+      icon: text.includes("bridge")
+        ? "bridge"
+        : text.includes("water") || text.includes("ford")
+        ? "wading"
+        : "crossing",
+      gpxType: "water",
+      priority: "high",
+    },
+    landmark: {
+      icon: "landmark",
+      gpxType: "building",
+      priority: "low",
+    },
+    timing: {
+      icon: "control",
+      gpxType: "checkpoint",
+      priority: "high",
+    },
+  };
+
+  return (
+    iconMapping[category] || {
+      icon: "waypoint",
+      gpxType: "waypoint",
+      priority: "medium",
+    }
+  );
+}
+
 function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
   const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="RallyMapper" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="RallyMapper-Voice-v2.0" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
   <metadata>
     <name>${name}</name>
+    <desc>Rally route created with RallyMapper Voice Navigation - ${
+      waypoints.length
+    } waypoints</desc>
+    <author>
+      <name>RallyMapper Voice</name>
+    </author>
     <time>${new Date().toISOString()}</time>
-  </metadata>
-`;
+    <keywords>rally,navigation,voice,waypoints,instructions</keywords>
+  </metadata>`;
 
+  // Enhanced waypoints with Rally Navigator specific formatting
   const waypointEntries = waypoints
-    .map(
-      (wp) => `
+    .map((wp, index) => {
+      const iconInfo = mapCategoryToStandardIcon(
+        wp.category || "general",
+        wp.name
+      );
+      const isVoiceCreated = wp.voiceCreated ? " (Voice)" : "";
+
+      // Create instruction-friendly name
+      const instructionName = wp.name;
+      const waypointNumber = (index + 1).toString().padStart(3, "0");
+
+      // Fix the timestamp issue - create a proper date
+      const waypointTime = wp.fullTimestamp
+        ? new Date(wp.fullTimestamp).toISOString()
+        : new Date().toISOString();
+
+      return `
   <wpt lat="${wp.lat}" lon="${wp.lon}">
-    <name>${wp.name}</name>
-    <desc>${wp.poi || ""}</desc>
-    <time>${wp.timestamp || new Date().toISOString()}</time>
-  </wpt>`
-    )
+    <name>WP${waypointNumber}: ${instructionName}${isVoiceCreated}</name>
+    <desc>${instructionName}</desc>
+    <cmt>${instructionName} - Distance: ${wp.distance}km${
+        wp.speedContext ? " - Speed: " + wp.speedContext : ""
+      }</cmt>
+    <time>${waypointTime}</time>
+    <sym>${iconInfo.icon}</sym>
+    <type>${iconInfo.gpxType}</type>
+    <extensions>
+      <category>${wp.category || "general"}</category>
+      <priority>${iconInfo.priority}</priority>
+      <voice_created>${wp.voiceCreated || false}</voice_created>
+      <rally_icon>${iconInfo.icon}</rally_icon>
+      <instruction>${instructionName}</instruction>
+      <distance_km>${wp.distance}</distance_km>
+      ${
+        wp.speedContext
+          ? `<speed_context>${wp.speedContext}</speed_context>`
+          : ""
+      }
+      ${
+        wp.rawTranscript
+          ? `<original_transcript>${wp.rawTranscript}</original_transcript>`
+          : ""
+      }
+      ${
+        wp.processedText
+          ? `<processed_text>${wp.processedText}</processed_text>`
+          : ""
+      }
+    </extensions>
+  </wpt>`;
+    })
     .join("");
 
+  // Enhanced route stage with Rally Navigator specific route points
+  const routestage =
+    waypoints.length > 1
+      ? `
+  <rte>
+    <name>${name} - Rally Instructions</name>
+    <desc>Rally navigation route with turn-by-turn instructions - ${
+      waypoints.length
+    } waypoints - Total distance: ${
+          waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0
+        }km</desc>
+    <extensions>
+      <total_waypoints>${waypoints.length}</total_waypoints>
+      <voice_waypoints>${
+        waypoints.filter((wp) => wp.voiceCreated).length
+      }</voice_waypoints>
+      <creation_date>${new Date().toISOString()}</creation_date>
+      <rally_instructions>true</rally_instructions>
+    </extensions>
+    ${waypoints
+      .map((wp, index) => {
+        const iconInfo = mapCategoryToStandardIcon(
+          wp.category || "general",
+          wp.name
+        );
+        const waypointNumber = (index + 1).toString().padStart(3, "0");
+
+        return `
+    <rtept lat="${wp.lat}" lon="${wp.lon}">
+      <name>WP${waypointNumber}: ${wp.name}</name>
+      <desc>${wp.name}</desc>
+      <cmt>${wp.name} - ${wp.distance}km</cmt>
+      <sym>${iconInfo.icon}</sym>
+      <type>${iconInfo.gpxType}</type>
+      <extensions>
+        <rally_instruction>${wp.name}</rally_instruction>
+        <instruction_text>${wp.name}</instruction_text>
+        <distance_from_start>${wp.distance}</distance_from_start>
+        <waypoint_category>${wp.category || "general"}</waypoint_category>
+        <waypoint_number>${index + 1}</waypoint_number>
+        <voice_created>${wp.voiceCreated || false}</voice_created>
+      </extensions>
+    </rtept>`;
+      })
+      .join("")}
+  </rte>`
+      : "";
+
+  // Enhanced tracking with metadata
   const trackingSegment =
     trackingPoints.length > 0
       ? `
   <trk>
-    <name>${name} - Auto Track</name>
+    <name>${name} - GPS Track</name>
+    <desc>Auto-recorded GPS breadcrumbs - ${trackingPoints.length} points</desc>
+    <extensions>
+      <track_points>${trackingPoints.length}</track_points>
+      <recording_interval>20_seconds</recording_interval>
+    </extensions>
     <trkseg>
       ${trackingPoints
         .map(
           (pt) => `
       <trkpt lat="${pt.lat}" lon="${pt.lon}">
-        <time>${pt.timestamp}</time>
+        <time>${pt.timestamp || new Date().toISOString()}</time>
       </trkpt>`
         )
         .join("")}
@@ -121,61 +284,435 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
   const gpxFooter = `
 </gpx>`;
 
-  return gpxHeader + waypointEntries + trackingSegment + gpxFooter;
+  return gpxHeader + waypointEntries + routestage + trackingSegment + gpxFooter;
 }
 
-export default function App() {
+function buildKML(waypoints = [], trackingPoints = [], name = "Route") {
+  const kmlHeader = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${name}</name>
+    <description>Rally route - ${waypoints.length} waypoints</description>
+    
+    <!-- Waypoint Folder -->
+    <Folder>
+      <name>Waypoints</name>
+      <description>Rally waypoints</description>`;
+
+  // Individual waypoint placemarks
+  const waypointPlacemarks = waypoints
+    .map(
+      (wp, index) => `
+      <Placemark>
+        <name>WP${(index + 1).toString().padStart(2, "0")} ${wp.name}</name>
+        <description>${wp.name} - ${wp.distance}km${
+        wp.voiceCreated ? " (Voice)" : ""
+      }</description>
+        <Point>
+          <coordinates>${wp.lon},${wp.lat},0</coordinates>
+        </Point>
+      </Placemark>`
+    )
+    .join("");
+
+  const waypointFolderClose = `
+    </Folder>`;
+
+  // Tracking folder
+  const trackingFolder =
+    trackingPoints.length > 0
+      ? `
+    <Folder>
+      <name>GPS Track</name>
+      <description>Auto-recorded GPS track</description>
+      <Placemark>
+        <name>${name} Track</name>
+        <description>GPS breadcrumbs - ${
+          trackingPoints.length
+        } points</description>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            ${trackingPoints
+              .map((pt) => `${pt.lon},${pt.lat},0`)
+              .join("\n            ")}
+          </coordinates>
+        </LineString>
+      </Placemark>
+    </Folder>`
+      : "";
+
+  return (
+    kmlHeader +
+    waypointPlacemarks +
+    waypointFolderClose +
+    trackingFolder +
+    `
+  </Document>
+</kml>`
+  );
+}
+
+const exportFileIPadCompatible = async (
+  content,
+  filename,
+  mimeType,
+  title = "Rally Mapper Export"
+) => {
+  try {
+    console.log(`🔍 === STARTING EXPORT: ${filename} ===`);
+    console.log(`📄 Content length: ${content.length} characters`);
+    console.log(`📄 MIME type: ${mimeType}`);
+    console.log(`📄 File size: ${new Blob([content]).size} bytes`);
+
+    const env = {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      isIPad: /iPad|iPhone|iPod/.test(navigator.userAgent),
+      isPWA: window.navigator.standalone,
+      isIOSSafari:
+        /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
+      canShare: !!navigator.canShare,
+      canShareFiles: navigator.canShare
+        ? navigator.canShare({ files: [new File([""], "test.txt")] })
+        : false,
+      downloadSupport: "download" in document.createElement("a"),
+      blobSupport: !!window.Blob,
+      urlSupport: !!window.URL,
+    };
+
+    console.log("🔍 Export Environment:", env);
+
+    const blob = new Blob([content], { type: mimeType });
+    console.log(`📄 Blob created: ${blob.size} bytes, type: ${blob.type}`);
+
+    // METHOD 1: Try iOS Share Sheet (Most reliable on iPad)
+    if (env.canShare && env.canShareFiles) {
+      try {
+        const file = new File([blob], filename, { type: mimeType });
+        console.log(`📤 Attempting share sheet: ${file.name}`);
+
+        await navigator.share({
+          files: [file],
+          title: title,
+          text: `Rally route export: ${filename}`,
+        });
+
+        console.log("✅ Share sheet successful");
+        return { success: true, method: "share_sheet" };
+      } catch (shareErr) {
+        console.log("⚠️ Share sheet failed:", shareErr.message);
+      }
+    }
+
+    // METHOD 2: Direct download (works in some iPad browsers)
+    if (env.downloadSupport && env.urlSupport) {
+      try {
+        console.log("📥 Attempting direct download");
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 1000);
+        console.log("✅ Direct download triggered");
+        return { success: true, method: "direct_download" };
+      } catch (downloadErr) {
+        console.log("⚠️ Direct download failed:", downloadErr.message);
+      }
+    }
+
+    // METHOD 3: Open in new window (iPad fallback)
+    try {
+      console.log("🔗 Attempting new window method");
+      const url = URL.createObjectURL(blob);
+      const newWindow = window.open(url, "_blank");
+      if (newWindow) {
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        console.log("✅ New window opened");
+        return { success: true, method: "new_window" };
+      } else {
+        throw new Error("Popup blocked");
+      }
+    } catch (windowErr) {
+      console.log("⚠️ New window failed:", windowErr.message);
+    }
+
+    // METHOD 4: Data URL (last resort)
+    try {
+      console.log("📋 Attempting data URL method");
+      const reader = new FileReader();
+      return new Promise((resolve) => {
+        reader.onload = () => {
+          const dataUrl = reader.result;
+          const a = document.createElement("a");
+          a.href = dataUrl;
+          a.download = filename;
+          a.click();
+          console.log("✅ Data URL method triggered");
+          resolve({ success: true, method: "data_url" });
+        };
+        reader.readAsDataURL(blob);
+      });
+    } catch (dataErr) {
+      console.log("⚠️ Data URL failed:", dataErr.message);
+    }
+
+    throw new Error("All export methods failed");
+  } catch (error) {
+    console.error(`❌ Export failed for ${filename}:`, error);
+    return { success: false, error: error.message };
+  }
+};
+
+const libraries = []; // declared outside the component or at top level
+
+function Home() {
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: "AIzaSyCYZchsHu_Sd4KMNP1b6Dq30XzWWOuFPO8",
+    libraries,
+  });
+  const [currentRecognition, setCurrentRecognition] = useState(null);
   const [routeName, setRouteName] = useState("");
   const [startGPS, setStartGPS] = useState(null);
-  const [sections, setSections] = useState([]);
-  const [sectionSummaries, setSectionSummaries] = useState([]);
-  const [sectionName, setSectionName] = useState("Section 1");
+  const [stage, setstage] = useState([]);
+  const [stageSummaries, setstageSummaries] = useState([]);
+  const [stageName, setstageName] = useState("Stage 1");
   const [trackingPoints, setTrackingPoints] = useState([]);
   const [waypoints, setWaypoints] = useState([]);
+  const [showReplay, setShowReplay] = useState(false);
   const waypointListRef = useRef(null);
-  const [activeCategory, setActiveCategory] = useState("Abbreviations");
-  const [selectedIcon, setSelectedIcon] = useState(null);
-  const [poi, setPoi] = useState("");
   const [recognitionActive, setRecognitionActive] = useState(false);
   const [currentGPS, setCurrentGPS] = useState(null);
   const [showMap, setShowMap] = useState(true);
   const [todayDate, setTodayDate] = useState("");
-  const [sectionCount, setSectionCount] = useState(1);
+  const [stageCount, setstageCount] = useState(1);
   const [fullScreenMap, setFullScreenMap] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
-  const [sectionStarted, setSectionStarted] = useState(false);
+  const [stageStarted, setstageStarted] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [totalDistance, setTotalDistance] = useState(0);
+  const [selectedWaypoint, setSelectedWaypoint] = useState(null);
+  const [showEndstageConfirm, setShowEndstageConfirm] = useState(false);
+  const [showStartstageConfirm, setShowStartstageConfirm] = useState(false);
+  const [currentDay, setCurrentDay] = useState(1);
+  const [dayRoutes, setDayRoutes] = useState([]);
+  const [currentRoute, setCurrentRoute] = useState(1);
+  const [editingWaypoint, setEditingWaypoint] = useState(null);
+  const [editValues, setEditValues] = useState({ name: "", poi: "" });
+  const [selectedWaypoints, setSelectedWaypoints] = useState(new Set());
+  const [bulkSelectMode, setBulkSelectMode] = useState(false);
+  const [gpsAccuracy, setGpsAccuracy] = useState(null);
+  const [gpsLoading, setGpsLoading] = useState(true);
+  const [gpsError, setGpsError] = useState(null);
+  const [waypointAdded, setWaypointAdded] = useState(false);
+  const [stageLoading, setstageLoading] = useState(false);
+  const [showUndo, setShowUndo] = useState(false);
+  const [undoTimeLeft, setUndoTimeLeft] = useState(5);
+  const [showVoiceInstructions, setShowVoiceInstructions] = useState(false);
+  const [mapType, setMapType] = useState("roadmap");
+  const [showRouteStats, setShowRouteStats] = useState(false);
+  const [mapZoom, setMapZoom] = useState(15);
+  const [isFollowingGPS, setIsFollowingGPS] = useState(true);
+  const [staticMapCenter, setStaticMapCenter] = useState(null);
+  const [userHasInteractedWithMap, setUserHasInteractedWithMap] =
+    useState(false);
+  const [syncStatus, setSyncStatus] = useState("offline");
+  const [continuousListening, setContinuousListening] = useState(false);
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isGuestMode, setIsGuestMode] = useState(false);
 
+  // Auth status check
   useEffect(() => {
-    const saved = localStorage.getItem("unsavedWaypoints");
-    if (saved) setWaypoints(JSON.parse(saved));
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setSyncStatus(session ? "online" : "offline");
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setSyncStatus(session ? "online" : "offline");
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const initializeAuth = async () => {
+      setAuthLoading(true);
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error("Session error:", error);
+          setUser(null);
+        } else if (session?.user) {
+          setUser(session.user);
+          setIsGuestMode(false);
+        } else {
+          const guestPreference = localStorage.getItem("guestMode");
+          if (guestPreference === "true") {
+            setUser("guest");
+            setIsGuestMode(true);
+          } else {
+            setUser(null);
+          }
+        }
+      } catch (error) {
+        console.error("Auth initialization error:", error);
+        setUser(null);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        setUser(session.user);
+        setIsGuestMode(false);
+        localStorage.removeItem("guestMode");
+      } else if (event === "SIGNED_OUT") {
+        setUser(null);
+        setIsGuestMode(false);
+        localStorage.removeItem("guestMode");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleAuthSuccess = (userData) => {
+    if (userData === "guest") {
+      setUser("guest");
+      setIsGuestMode(true);
+      localStorage.setItem("guestMode", "true");
+    } else {
+      setUser(userData);
+      setIsGuestMode(false);
+      localStorage.removeItem("guestMode");
+    }
+  };
+
+  // Auto-save to Supabase
+  useEffect(() => {
+    if (user && user !== "guest" && waypoints.length > 0) {
+      const saveTimer = setTimeout(() => {
+        dataSync
+          .autoSave({ waypoints, trackingPoints, routeName })
+          .then(() => setSyncStatus("synced"))
+          .catch(() => setSyncStatus("error"));
+      }, 5000);
+
+      return () => clearTimeout(saveTimer);
+    }
+  }, [waypoints, user, trackingPoints, routeName]);
+
+  useEffect(() => {
+    return () => {
+      // Cleanup function to stop recognition when component unmounts
+      if (currentRecognition) {
+        currentRecognition.stop();
+        setCurrentRecognition(null);
+      }
+    };
+  }, [currentRecognition]);
+
+  // Load saved waypoints
+  useEffect(() => {
+    const stored = localStorage.getItem("unsavedWaypoints");
+    if (stored) {
+      setWaypoints(JSON.parse(stored));
+    }
+  }, []);
+
+  // GPS tracking
   useEffect(() => {
     const geo = navigator.geolocation;
     if (!geo) {
       console.error("Geolocation is not supported.");
+      setGpsError("Geolocation is not supported by this device");
+      setGpsLoading(false);
       return;
     }
 
-    const watchId = geo.watchPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const gps = { lat: latitude, lon: longitude };
-        setCurrentGPS(gps);
-        console.log("📍 GPS Updated:", gps); // ✅ Confirm it's changing
-      },
-      (err) => {
-        console.error("❌ GPS error", err);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-    );
+    setGpsLoading(true);
+    setGpsError(null);
 
-    return () => geo.clearWatch(watchId);
+    const handleSuccess = (pos) => {
+      const { latitude, longitude, accuracy } = pos.coords;
+      const gps = { lat: latitude, lon: longitude };
+      setCurrentGPS(gps);
+      setGpsAccuracy(accuracy);
+      setGpsLoading(false);
+      setGpsError(null);
+      console.log(
+        "📍 GPS Updated:",
+        gps.lat.toFixed(6),
+        gps.lon.toFixed(6),
+        "Accuracy:",
+        Math.round(accuracy) + "m"
+      );
+    };
+
+    const handleError = (err) => {
+      console.error("❌ GPS error", err);
+      setGpsLoading(false);
+
+      switch (err.code) {
+        case err.PERMISSION_DENIED:
+          setGpsError(
+            "GPS access denied. Please enable location permissions in your browser settings."
+          );
+          break;
+        case err.POSITION_UNAVAILABLE:
+          setGpsError(
+            "GPS signal unavailable. Try moving to an open area or reloading the page."
+          );
+          break;
+        case err.TIMEOUT:
+          setGpsError("GPS timeout. Trying again...");
+          setTimeout(() => {
+            setGpsLoading(true);
+            setGpsError(null);
+          }, 2000);
+          break;
+        default:
+          setGpsError(
+            `GPS error (${err.code}): ${err.message}. Check your location settings.`
+          );
+      }
+    };
+
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 60000,
+    };
+
+    geo.getCurrentPosition(handleSuccess, handleError, options);
+    const watchId = geo.watchPosition(handleSuccess, handleError, options);
+
+    return () => {
+      if (watchId) {
+        geo.clearWatch(watchId);
+      }
+    };
   }, []);
-
-  console.log("📍 GPS updated:", currentGPS?.lat, currentGPS?.lon);
 
   useEffect(() => {
     setTodayDate(new Date().toISOString().split("T")[0]);
@@ -198,97 +735,164 @@ export default function App() {
   }, [waypoints]);
 
   useEffect(() => {
-    if (!isTracking || !currentGPS?.lat || !currentGPS?.lon) return;
+    if (!isTracking) return;
 
     const interval = setInterval(() => {
-      const newPoint = {
-        lat: currentGPS.lat,
-        lon: currentGPS.lon,
-        timestamp: new Date().toISOString(),
-      };
+      if (currentGPS?.lat && currentGPS?.lon) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const newPoint = {
+              lat: pos.coords.latitude,
+              lon: pos.coords.longitude,
+              timestamp: new Date().toISOString(),
+            };
 
-      setTrackingPoints((prev) => {
-        if (prev.length > 0) {
-          const last = prev[prev.length - 1];
-          const dist = parseFloat(
-            calculateDistance(last.lat, last.lon, newPoint.lat, newPoint.lon)
-          );
-          setTotalDistance((td) => parseFloat((td + dist).toFixed(2)));
-        }
-        return [...prev, newPoint];
-      });
+            setTrackingPoints((prev) => {
+              if (prev.length > 0) {
+                const last = prev[prev.length - 1];
+                const dist = parseFloat(
+                  calculateDistance(
+                    last.lat,
+                    last.lon,
+                    newPoint.lat,
+                    newPoint.lon
+                  )
+                );
+                setTotalDistance((td) => parseFloat((td + dist).toFixed(2)));
+              }
+              return [...prev, newPoint];
+            });
 
-      console.log("📍 Auto-tracked:", newPoint);
-    }, 10000);
+            setCurrentGPS({ lat: newPoint.lat, lon: newPoint.lon });
+            console.log("📍 Auto-tracked:", newPoint);
+          },
+          (err) => console.error("❌ GPS error", err),
+          { enableHighAccuracy: true, timeout: 15000 }
+        );
+      }
+    }, 20000);
 
     return () => clearInterval(interval);
   }, [isTracking, currentGPS]);
 
+  useEffect(() => {
+    if (!showUndo) return;
+
+    const interval = setInterval(() => {
+      setUndoTimeLeft((prev) => {
+        if (prev <= 1) {
+          setShowUndo(false);
+          return 5;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [showUndo]);
+
+  const handleNewDay = () => {
+    if (waypoints.length > 0 || routeName.trim() !== "") {
+      const confirmNewDay = window.confirm(
+        `Start Day ${
+          currentDay + 1
+        }? This will clear all current day data (routes, stages, waypoints). Make sure you've exported your current data first.`
+      );
+
+      if (!confirmNewDay) return;
+    }
+
+    setCurrentDay((prev) => prev + 1);
+    setCurrentRoute(1);
+    setRouteName("");
+    setWaypoints([]);
+    setTrackingPoints([]);
+    setstage([]);
+    setstageSummaries([]);
+    setstageCount(1);
+    setstageStarted(false);
+    setIsTracking(false);
+    setTotalDistance(0);
+
+    localStorage.removeItem("unsavedWaypoints");
+
+    console.log(`📅 Started Day ${currentDay + 1}`);
+  };
+
+  const handleNewRoute = () => {
+    if (waypoints.length > 0 || routeName.trim() !== "") {
+      const confirmNewRoute = window.confirm(
+        `Start new route? This will clear current route data (stages, waypoints). Make sure you've exported your current route first.`
+      );
+
+      if (!confirmNewRoute) return;
+    }
+
+    setCurrentRoute((prev) => prev + 1);
+    setRouteName("");
+    setWaypoints([]);
+    setTrackingPoints([]);
+    setstageCount(1);
+    setstageStarted(false);
+    setIsTracking(false);
+    setTotalDistance(0);
+
+    localStorage.removeItem("unsavedWaypoints");
+
+    console.log(`🗺️ Started Route ${currentRoute + 1} for Day ${currentDay}`);
+  };
+
   const handleAddWaypoint = () => {
-    if (!currentGPS) return;
-    const timestamp = new Date().toLocaleTimeString();
-    const distance =
-      waypoints.length > 0
-        ? calculateDistance(
-            waypoints[waypoints.length - 1].lat,
-            waypoints[waypoints.length - 1].lon,
-            currentGPS.lat,
-            currentGPS.lon
-          )
-        : 0;
+    if (!currentGPS) {
+      setGpsError("No GPS signal available. Please wait for GPS to be ready.");
+      return;
+    }
+
+    const now = new Date();
+    const timestamp = now.toLocaleTimeString();
+    const fullTimestamp = now.toISOString();
+
+    const cumulativeDistance = startGPS
+      ? calculateCumulativeDistance(waypoints, currentGPS.lat, currentGPS.lon)
+      : 0;
+
     const waypoint = {
       name: "Unnamed",
-      // iconSrc: "",
       lat: currentGPS.lat,
       lon: currentGPS.lon,
       timestamp,
-      distance,
+      fullTimestamp,
+      distance: cumulativeDistance,
       poi: "",
     };
     setWaypoints((prev) => [...prev, waypoint]);
+
+    setWaypointAdded(true);
+    setTimeout(() => setWaypointAdded(false), 2000);
+
+    if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
+
+    console.log("✅ Waypoint added:", waypoint);
+
+    setShowUndo(true);
+    setUndoTimeLeft(5);
   };
 
-  const handleIconSelect = (iconName) => {
-    setSelectedIcon(iconName);
-    setWaypoints((prev) => {
-      if (prev.length === 0) return prev;
-      const updated = [...prev];
-      const icon = allIcons.find((i) => i.name === iconName);
-      const last = { ...updated[updated.length - 1] };
-      last.name = icon?.name || iconName;
-      last.iconSrc = icon?.src || "";
-      updated[updated.length - 1] = last;
-      return updated;
-    });
-    if (navigator.vibrate) navigator.vibrate(30);
-  };
-
-  const updateLastWaypointIcon = (iconName) => {
-    const icon = allIcons.find((i) => i.name === iconName);
-    setWaypoints((prev) => {
-      const updated = [...prev];
-      const last = updated.length - 1;
-      if (last >= 0) {
-        updated[last] = {
-          ...updated[last],
-          name: icon?.name || iconName,
-          iconSrc: icon?.src,
-        };
-      }
-      return updated;
-    });
-  };
-
-  const handleStartSection = () => {
-    setSectionStarted(true);
-    setIsTracking(true); // ✅ Start tracking immediately
-    setTrackingPoints([]); // ✅ Reset previous tracking points
-    setWaypoints([]); // Optional: also reset waypoints if needed
+  const handleStartstage = () => {
+    setstageLoading(true);
+    setstageStarted(true);
+    setIsTracking(true);
+    setTrackingPoints([]);
+    setWaypoints([]);
     setTotalDistance(0);
+    setIsFollowingGPS(true);
+    setUserHasInteractedWithMap(false);
 
     const geo = navigator.geolocation;
     if (!geo) {
       console.error("❌ Geolocation not supported");
+      setGpsError("Geolocation not supported on this device");
+      setstageLoading(false);
       setRefreshKey((prev) => prev + 1);
       return;
     }
@@ -300,33 +904,73 @@ export default function App() {
         setStartGPS(newGPS);
         setCurrentGPS(newGPS);
 
-        const sectionName = `${todayDate}/Section ${sectionCount}`;
-        setSections((prev) => [...prev, { name: sectionName, waypoints: [] }]);
-        setSectionName(sectionName);
-        setSectionCount((prev) => prev + 1);
+        const stageName = `Day${currentDay}/Route${currentRoute}/Stage${stageCount}`;
+        console.log("🔍 Debug stage creation:");
+        console.log("- todayDate:", todayDate);
+        console.log("- stageCount:", stageCount);
+        console.log("- stageName:", stageName);
+        setstage((prev) => [...prev, { name: stageName, waypoints: [] }]);
+        setstageName(stageName);
+        setstageCount((prev) => prev + 1);
+        setstageLoading(false);
 
-        console.log("✅ Start Section Initialized:", sectionName, newGPS);
+        console.log("✅ Start stage Initialized:", stageName, newGPS);
       },
       (err) => {
         console.error("❌ Failed to get GPS:", err);
+        setGpsError("Failed to get starting GPS position. Please try again.");
+        setstageLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 6000 }
     );
   };
 
-  const containerStyle = {
-    width: "100%",
-    height: "100%",
+  const mapCenter = (() => {
+    if (!isFollowingGPS && userHasInteractedWithMap) {
+      return undefined;
+    }
+
+    if (isFollowingGPS && currentGPS) {
+      return { lat: currentGPS.lat, lng: currentGPS.lon };
+    }
+
+    if (waypoints.length > 0) {
+      return { lat: waypoints[0].lat, lng: waypoints[0].lon };
+    }
+
+    if (currentGPS) {
+      return { lat: currentGPS.lat, lng: currentGPS.lon };
+    }
+
+    return { lat: -35.0, lng: 138.75 };
+  })();
+
+  const handleMapDragStart = () => {
+    console.log("🗺️ User dragged map - stopping GPS follow");
+    setIsFollowingGPS(false);
+    setUserHasInteractedWithMap(true);
   };
 
-  const mapCenter = currentGPS
-    ? { lat: currentGPS.lat, lng: currentGPS.lon }
-    : { lat: -35.0, lng: 138.75 }; // fallback if GPS isn't ready
+  const handleMapDragEnd = () => {
+    console.log("🗺️ Map drag ended - position maintained");
+  };
 
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: "AIzaSyCYZchsHu_Sd4KMNP1b6Dq30XzWWOuFPO8", // 🔐 replace with your actual key
-    libraries: [], // minimal mode
-  });
+  const recenterOnGPS = () => {
+    if (currentGPS) {
+      console.log("🎯 Re-centering on current GPS");
+      setIsFollowingGPS(true);
+      setUserHasInteractedWithMap(false);
+      setRefreshKey((prev) => prev + 1);
+    }
+  };
+
+  const handleMapZoomChanged = (map) => {
+    if (map) {
+      const newZoom = map.getZoom();
+      setMapZoom(newZoom);
+      setUserHasInteractedWithMap(true);
+    }
+  };
 
   const startVoiceInput = () => {
     const SpeechRecognition =
@@ -340,202 +984,1619 @@ export default function App() {
     recognition.lang = "en-AU";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
+    recognition.continuous = false;
 
     recognition.onstart = () => {
       setRecognitionActive(true);
-      new Audio(startSound).play();
+      try {
+        new Audio(startSound).play().catch((err) => {
+          console.log("Audio play prevented:", err.message);
+        });
+      } catch (err) {
+        console.log("Audio not available");
+      }
+      console.log("🎤 Voice recognition started");
     };
 
     recognition.onend = () => {
       setRecognitionActive(false);
-      new Audio(stopSound).play();
+      try {
+        new Audio(stopSound).play().catch((err) => {
+          console.log("Audio play prevented:", err.message);
+        });
+      } catch (err) {
+        console.log("Audio not available");
+      }
+      console.log("🎤 Voice recognition ended");
     };
 
     recognition.onresult = (event) => {
       const spokenText = event.results[0][0].transcript;
-      setPoi(spokenText);
+      console.log("🗣️ Voice input received:", spokenText);
+      processVoiceCommand(spokenText);
     };
 
     recognition.onerror = (event) => {
       console.error("Voice input error:", event.error);
+      setRecognitionActive(false);
+
+      let errorMessage = "Voice recognition error.";
+      switch (event.error) {
+        case "no-speech":
+          errorMessage = "No speech detected. Try again.";
+          break;
+        case "audio-capture":
+          errorMessage = "Microphone access error.";
+          break;
+        case "not-allowed":
+          errorMessage = "Microphone permission denied.";
+          break;
+      }
+
+      setGpsError(errorMessage);
+      setTimeout(() => setGpsError(null), 500);
     };
 
     recognition.start();
   };
 
-  const exportAsJSON = async (
-    waypointsData = waypoints,
-    trackingData = trackingPoints,
-    name = "section"
-  ) => {
-    const data = {
-      routeName: routeName || name,
-      date: new Date().toISOString(),
-      waypoints: waypointsData,
-      tracking: trackingData,
+  const handleGlobalVoiceCommands = () => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech Recognition is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-AU";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+
+    recognition.onstart = () => {
+      setRecognitionActive(true);
+      new Audio(startSound).play();
+      console.log("🎤 Global voice recognition started");
     };
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
-    });
+    recognition.onend = () => {
+      setRecognitionActive(false);
+      new Audio(stopSound).play();
+      console.log("🎤 Global voice recognition ended");
+    };
 
-    const file = new File([blob], `${name}.json`, {
-      type: "application/json",
-    });
+    recognition.onresult = (event) => {
+      const spokenText = event.results[0][0].transcript;
+      console.log("🗣️ Global voice input received:", spokenText);
+      processGlobalVoiceCommand(spokenText);
+    };
 
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: "Rally Mapper Export",
-          text: "Section data (waypoints + tracking)",
-        });
-        console.log("✅ Shared via iOS share sheet");
-        return;
-      } catch (err) {
-        console.warn("Share failed or cancelled", err);
+    recognition.onerror = (event) => {
+      console.error("Global voice input error:", event.error);
+      setRecognitionActive(false);
+
+      let errorMessage = "Voice recognition error.";
+      switch (event.error) {
+        case "no-speech":
+          errorMessage = "No speech detected. Try again.";
+          break;
+        case "audio-capture":
+          errorMessage = "Microphone access error.";
+          break;
+        case "not-allowed":
+          errorMessage = "Microphone permission denied.";
+          break;
+      }
+
+      setGpsError(errorMessage);
+      setTimeout(() => setGpsError(null), 1000);
+    };
+
+    recognition.start();
+  };
+
+  const processGlobalVoiceCommand = (transcript) => {
+    const cleanText = transcript.trim().toLowerCase();
+    console.log("🗣️ Processing global command:", cleanText);
+
+    if (
+      cleanText.includes("stage start") ||
+      cleanText.includes("start stage")
+    ) {
+      if (waypoints.length > 0) {
+        setShowStartstageConfirm(true);
+      } else {
+        handleStartstage();
+      }
+      return;
+    }
+
+    if (cleanText.includes("stage end") || cleanText.includes("end stage")) {
+      if (stageStarted) {
+        setShowEndstageConfirm(true);
+      } else {
+        setGpsError("No active stage to end.");
+        setTimeout(() => setGpsError(null), 1000);
+      }
+      return;
+    }
+
+    if (stageStarted) {
+      processVoiceCommand(transcript);
+    } else {
+      setGpsError("Start a stage first to add waypoints.");
+      setTimeout(() => setGpsError(null), 1000);
+    }
+  };
+
+  const detectCategory = (description) => {
+    const text = description.toLowerCase();
+
+    const patterns = {
+      safety: [
+        /danger|hazard|warning|careful|watch|avoid|risk|unsafe/,
+        /severe|extreme|major|critical|emergency/,
+        /washout|bridge out|road closed|blocked/,
+      ],
+      navigation: [
+        /left|right|straight|turn|continue|bear|veer|fork|junction/,
+        /onto|into|towards|follow|take|keep/,
+        /road|track|path|lane|route/,
+      ],
+      surface: [
+        /bump|hole|rough|smooth|gravel|tarmac|concrete|dirt|mud|sand|washout|rut/,
+        /sealed|unsealed|bitumen|metal|loose|firm|soft|hard/,
+        /surface|condition|texture/,
+      ],
+      obstacle: [
+        /grid|gate|cattle|fence|barrier|bollard|post|sign/,
+        /wire|electric|wooden|metal|stock/,
+      ],
+      elevation: [
+        /hill|summit|peak|climb|descent|steep|uphill|downhill|crest|ridge/,
+        /up|down|rise|fall|gradient|slope/,
+      ],
+      crossing: [
+        /bridge|water|ford|creek|river|stream|crossing|splash/,
+        /culvert|causeway|low water/,
+      ],
+      landmark: [
+        /house|building|shed|barn|tower|mast|church|pub|shop|station/,
+        /tank|silo|windmill|monument|marker/,
+      ],
+      timing: [
+        /start|finish|checkpoint|control|timing|stage/,
+        /stop|restart|neutralisation/,
+      ],
+    };
+
+    let bestCategory = "general";
+    let bestScore = 0;
+
+    for (const [category, categoryPatterns] of Object.entries(patterns)) {
+      let score = 0;
+      for (const pattern of categoryPatterns) {
+        if (pattern.test(text)) {
+          score += text.match(pattern) ? text.match(pattern).length : 0;
+        }
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestCategory = category;
       }
     }
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${name}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    console.log("⬇️ Download triggered (fallback)");
+    console.log(
+      `📂 Category detected: "${text}" → ${bestCategory} (score: ${bestScore})`
+    );
+    return bestCategory;
   };
 
-  function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
-    const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
-  <gpx version="1.1" creator="RallyMapper" xmlns="http://www.topografix.com/GPX/1/1">
-    <metadata>
-      <name>${name}</name>
-      <time>${new Date().toISOString()}</time>
-    </metadata>
-  `;
+  const smartTextCorrection = (rawText) => {
+    let corrected = rawText.toLowerCase().trim();
 
-    const exportAsGPX = (
-      waypointsData = waypoints,
-      trackingData = trackingPoints,
-      name = "route"
-    ) => {
-      const gpxContent = buildGPX(waypointsData, trackingData, name);
-      const blob = new Blob([gpxContent], { type: "application/octet-stream" });
-
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-
-      a.href = url;
-      a.download = `${name}.gpx`; // ✅ Ensure .gpx extension is present
-      document.body.appendChild(a); // ✅ Append to DOM
-      a.click(); // ✅ Trigger download
-      document.body.removeChild(a); // ✅ Clean up
-      window.URL.revokeObjectURL(url); // ✅ Free memory
-
-      console.log("⬇️ Forced GPX download triggered");
+    const corrections = {
+      write: "right",
+      wright: "right",
+      rite: "right",
+      lift: "left",
+      laugh: "left",
+      strait: "straight",
+      "straight ahead": "straight",
+      grade: "grid",
+      great: "grid",
+      greed: "grid",
+      "cattle guard": "grid",
+      "cattle grid": "grid",
+      summary: "summit",
+      submit: "summit",
+      sumit: "summit",
+      caution: "caution",
+      cation: "caution",
+      washout: "washout",
+      "wash out": "washout",
+      wash: "washout",
+      "gravel road": "gravel",
+      "tarmac road": "tarmac",
+      "sealed road": "tarmac",
+      "dirt road": "dirt",
+      unsealed: "gravel",
+      "next to k": "next 2k",
+      "next 2 k": "next 2k",
+      "next two k": "next 2k",
+      "for 1k": "for 1k",
+      "for one k": "for 1k",
+      "turn left": "left turn",
+      "turn right": "right turn",
+      "keep going left": "keep left",
+      "keep going right": "keep right",
+      "carry straight": "keep straight",
+      "continue straight": "keep straight",
     };
 
-    const waypointEntries = waypoints
-      .map(
-        (wp) => `
-    <wpt lat="${wp.lat}" lon="${wp.lon}">
-      <name>${wp.name}</name>
-      <desc>${wp.poi || ""}</desc>
-      <time>${wp.timestamp || new Date().toISOString()}</time>
-    </wpt>`
-      )
-      .join("");
+    for (const [wrong, right] of Object.entries(corrections)) {
+      corrected = corrected.replace(new RegExp(wrong, "gi"), right);
+    }
 
-    const trackingSegment =
-      trackingPoints.length > 0
+    return corrected;
+  };
+
+  const expandRallyTerms = (text) => {
+    let expanded = text;
+
+    const expansions = {
+      l: "left",
+      r: "right",
+      str: "straight",
+      kr: "keep right",
+      kl: "keep left",
+      ks: "keep straight",
+      cg: "cattle grid",
+      wg: "wire gate",
+      fg: "fence gate",
+      br: "bridge",
+      fd: "ford",
+      xing: "crossing",
+      gr: "gravel",
+      tar: "tarmac",
+      conc: "concrete",
+      dt: "dirt",
+      rgh: "rough",
+      sth: "smooth",
+      dngr: "danger",
+      caut: "caution",
+      bump: "bump",
+      hole: "hole",
+      wo: "washout",
+      "1k": "1k",
+      "2k": "2k",
+      "3k": "3k",
+      "4k": "4k",
+      "5k": "5k",
+    };
+
+    for (const [abbrev, full] of Object.entries(expansions)) {
+      const regex = new RegExp(`\\b${abbrev}\\b`, "gi");
+      expanded = expanded.replace(regex, full);
+    }
+
+    return expanded;
+  };
+
+  const getSpeedContext = () => {
+    if (trackingPoints.length < 2) return "unknown";
+
+    const recent = trackingPoints.slice(-2);
+    const timeDiff =
+      (new Date(recent[1].timestamp) - new Date(recent[0].timestamp)) / 1000;
+    const distance =
+      parseFloat(
+        calculateDistance(
+          recent[0].lat,
+          recent[0].lon,
+          recent[1].lat,
+          recent[1].lon
+        )
+      ) * 1000;
+
+    const speedMPS = distance / timeDiff;
+    const speedKMH = speedMPS * 3.6;
+
+    if (speedKMH > 80) return "fast";
+    if (speedKMH > 40) return "medium";
+    if (speedKMH > 10) return "slow";
+    return "stationary";
+  };
+
+  const contextualProcessing = (text, speed) => {
+    let processed = text;
+
+    switch (speed) {
+      case "fast":
+        processed = processed
+          .replace(/followed by/g, "→")
+          .replace(/next stage/g, "next")
+          .replace(/approximately/g, "~");
+        break;
+      case "medium":
+        break;
+      case "slow":
+        processed = processed
+          .replace(/→/g, "followed by")
+          .replace(/~/g, "approximately");
+        break;
+      default:
+        break;
+    }
+
+    return processed;
+  };
+
+  const processVoiceCommand = (transcript) => {
+    const cleanText = transcript.trim().toLowerCase();
+    console.log("🗣️ Voice input:", cleanText);
+
+    if (cleanText.toLowerCase().includes("undo")) {
+      handleUndoLastWaypoint();
+      return;
+    }
+
+    if (
+      cleanText === "mic on" ||
+      cleanText === "mike on" ||
+      cleanText === "microphone on" ||
+      cleanText === "mick on" || // common misrecognition
+      cleanText === "make on" || // another common misrecognition
+      cleanText === "microphone on" ||
+      cleanText.includes("start listening") ||
+      cleanText.includes("continuous mode")
+    ) {
+      console.log("🟢 Mic On command detected - starting continuous listening");
+      startContinuousVoiceInput();
+      return;
+    }
+
+    // Enhanced Mic Off command detection with more variations
+    if (
+      cleanText === "mic off" ||
+      cleanText === "mike off" ||
+      cleanText === "microphone off" ||
+      cleanText === "mick off" ||
+      cleanText === "make off" ||
+      cleanText.includes("stop listening") ||
+      cleanText.includes("end continuous")
+    ) {
+      console.log("🔴 Mic Off command detected - stopping recognition");
+      stopContinuousListening();
+      return;
+    }
+
+    if (
+      cleanText.toLowerCase().includes("stage start") ||
+      cleanText.toLowerCase().includes("start stage")
+    ) {
+      handleStartstage();
+      return;
+    }
+
+    if (
+      cleanText.toLowerCase().includes("stage end") ||
+      cleanText.toLowerCase().includes("end stage")
+    ) {
+      setShowEndstageConfirm(true);
+      return;
+    }
+
+    handleNaturalWaypoint(cleanText);
+  };
+
+  // Add continuous listening mode
+  const startContinuousVoiceInput = () => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Speech Recognition is not supported in this browser.");
+      return;
+    }
+
+    // Stop any existing recognition first
+    if (currentRecognition) {
+      console.log("🔄 Stopping existing recognition before starting new one");
+      currentRecognition.stop();
+      setCurrentRecognition(null);
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-AU";
+    recognition.continuous = true; // Keep listening
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    setCurrentRecognition(recognition);
+
+    recognition.onstart = () => {
+      setRecognitionActive(true);
+      setContinuousListening(true);
+      console.log("🎤 Continuous voice recognition started");
+      try {
+        new Audio(startSound).play().catch((err) => {
+          console.log("Audio play prevented:", err.message);
+        });
+      } catch (err) {
+        console.log("Audio not available");
+      }
+    };
+
+    recognition.onresult = (event) => {
+      const lastResult = event.results[event.results.length - 1];
+      if (lastResult.isFinal) {
+        const spokenText = lastResult[0].transcript;
+        console.log("🗣️ Continuous voice input:", spokenText);
+        processVoiceCommand(spokenText);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Continuous voice error:", event.error);
+
+      // Handle specific errors
+      switch (event.error) {
+        case "no-speech":
+          // Ignore no-speech errors in continuous mode, keep listening
+          console.log("⚠️ No speech detected, continuing to listen...");
+          break;
+        case "aborted":
+          console.log("🔴 Recognition was aborted");
+          setContinuousListening(false);
+          setRecognitionActive(false);
+          setCurrentRecognition(null);
+          break;
+        default:
+          console.log("❌ Recognition error:", event.error);
+          setContinuousListening(false);
+          setRecognitionActive(false);
+          setCurrentRecognition(null);
+          setGpsError(`Voice recognition error: ${event.error}`);
+          setTimeout(() => setGpsError(null), 3000);
+          break;
+      }
+    };
+
+    recognition.onend = () => {
+      console.log("🎤 Continuous recognition ended");
+
+      // Only restart if we're still supposed to be in continuous listening mode
+      if (continuousListening && stageStarted) {
+        console.log("🔄 Restarting continuous listening...");
+        setTimeout(() => {
+          if (continuousListening) {
+            // Double-check the flag
+            startContinuousVoiceInput();
+          }
+        }, 500); // Reduced delay for better responsiveness
+      } else {
+        console.log("🔴 Continuous listening mode ended");
+        setRecognitionActive(false);
+        setCurrentRecognition(null);
+        setContinuousListening(false);
+        try {
+          new Audio(stopSound).play().catch((err) => {
+            console.log("Audio play prevented:", err.message);
+          });
+        } catch (err) {
+          console.log("Audio not available");
+        }
+      }
+    };
+
+    try {
+      recognition.start();
+    } catch (error) {
+      console.error("Failed to start recognition:", error);
+      setGpsError("Failed to start voice recognition");
+      setTimeout(() => setGpsError(null), 3000);
+    }
+  };
+
+  // New function to properly stop continuous listening
+  const stopContinuousListening = () => {
+    console.log("🔴 Stopping continuous listening...");
+    setContinuousListening(false);
+    setRecognitionActive(false);
+
+    if (currentRecognition) {
+      try {
+        currentRecognition.stop();
+        console.log("✅ Recognition stopped successfully");
+      } catch (error) {
+        console.log("⚠️ Error stopping recognition:", error);
+      }
+      setCurrentRecognition(null);
+    }
+
+    try {
+      new Audio(stopSound).play().catch((err) => {
+        console.log("Audio play prevented:", err.message);
+      });
+    } catch (err) {
+      console.log("Audio not available");
+    }
+  };
+
+  // Updated UI button for continuous listening
+  const ContinuousListeningButton = () => {
+    if (!stageStarted) return null;
+
+    return (
+      <button
+        onClick={() => {
+          console.log("🎤 Mic button clicked!");
+          console.log(
+            "- Current continuousListening state:",
+            continuousListening
+          );
+          if (continuousListening) {
+            console.log("🔴 Stopping continuous listening...");
+            stopContinuousListening();
+          } else {
+            console.log("🟢 Starting continuous listening...");
+            startContinuousVoiceInput();
+          }
+        }}
+        type="button"
+        style={{
+          padding: "18px 16px",
+          borderRadius: "8px",
+          fontSize: "1.0rem",
+          transition: "all 0.2s",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          backgroundColor: continuousListening ? "#EF4444" : "#16a34a",
+          color: "white",
+          cursor: "pointer",
+          border: "2px solid #1e3a8a",
+          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+        }}
+      >
+        {continuousListening ? (
+          <>
+            <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+            🔴 Mic Off
+          </>
+        ) : (
+          <>🎤 Mic On</>
+        )}
+      </button>
+    );
+  };
+
+  const handleNaturalWaypoint = (description) => {
+    if (!currentGPS) {
+      setGpsError("No GPS signal available for waypoint.");
+      return;
+    }
+
+    if (!description || description.trim().length < 2) {
+      setGpsError("Please provide a waypoint description.");
+      return;
+    }
+
+    const corrected = smartTextCorrection(description);
+    const expanded = expandRallyTerms(corrected);
+    const speed = getSpeedContext();
+    const contextual = contextualProcessing(expanded, speed);
+    const formattedName =
+      contextual.charAt(0).toUpperCase() + contextual.slice(1);
+
+    console.log(
+      `🧠 Smart processing: "${description}" → "${formattedName}" (speed: ${speed})`
+    );
+
+    const now = new Date();
+    const timestamp = now.toLocaleTimeString();
+    const fullTimestamp = now.toISOString();
+
+    const cumulativeDistance = startGPS
+      ? calculateCumulativeDistance(waypoints, currentGPS.lat, currentGPS.lon)
+      : 0;
+
+    const waypoint = {
+      name: formattedName,
+      lat: currentGPS.lat,
+      lon: currentGPS.lon,
+      timestamp,
+      fullTimestamp,
+      distance: cumulativeDistance,
+      poi: "",
+      iconSrc: "",
+      category: detectCategory(formattedName),
+      voiceCreated: true,
+      rawTranscript: description,
+      processedText: formattedName,
+      speedContext: speed,
+    };
+
+    setWaypoints((prev) => [...prev, waypoint]);
+
+    setWaypointAdded(true);
+    setTimeout(() => setWaypointAdded(false), 2000);
+    if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
+
+    setShowUndo(true);
+    setUndoTimeLeft(5);
+  };
+
+  const startEditingWaypoint = (index) => {
+    setEditingWaypoint(index);
+    setEditValues({
+      name: waypoints[index].name,
+      poi: waypoints[index].poi || "",
+    });
+  };
+
+  const saveWaypointEdit = () => {
+    if (editingWaypoint === null) return;
+
+    setWaypoints((prev) => {
+      const updated = [...prev];
+      updated[editingWaypoint] = {
+        ...updated[editingWaypoint],
+        name: editValues.name.trim() || "Unnamed",
+        poi: editValues.poi.trim(),
+      };
+      return updated;
+    });
+
+    setEditingWaypoint(null);
+    setEditValues({ name: "", poi: "" });
+
+    if (navigator.vibrate) navigator.vibrate([30]);
+
+    console.log("✅ Waypoint edited");
+  };
+
+  const cancelWaypointEdit = () => {
+    setEditingWaypoint(null);
+    setEditValues({ name: "", poi: "" });
+  };
+
+  const handleEditKeyPress = (e) => {
+    if (e.key === "Enter") {
+      saveWaypointEdit();
+    } else if (e.key === "Escape") {
+      cancelWaypointEdit();
+    }
+  };
+
+  const toggleBulkSelectMode = () => {
+    setBulkSelectMode(!bulkSelectMode);
+    setSelectedWaypoints(new Set());
+  };
+
+  const toggleWaypointSelection = (index) => {
+    setSelectedWaypoints((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllWaypoints = () => {
+    if (selectedWaypoints.size === waypoints.length) {
+      setSelectedWaypoints(new Set());
+    } else {
+      setSelectedWaypoints(new Set(waypoints.map((_, index) => index)));
+    }
+  };
+
+  const deleteSelectedWaypoints = () => {
+    if (selectedWaypoints.size === 0) return;
+
+    const confirmDelete = window.confirm(
+      `Delete ${selectedWaypoints.size} selected waypoint${
+        selectedWaypoints.size !== 1 ? "s" : ""
+      }? This cannot be undone.`
+    );
+
+    if (!confirmDelete) return;
+
+    const indicesToDelete = Array.from(selectedWaypoints).sort((a, b) => b - a);
+
+    setWaypoints((prev) => {
+      let updated = [...prev];
+      indicesToDelete.forEach((index) => {
+        updated.splice(index, 1);
+      });
+      return updated;
+    });
+
+    setSelectedWaypoints(new Set());
+    setBulkSelectMode(false);
+
+    if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
+
+    console.log(`🗑️ Deleted ${selectedWaypoints.size} waypoints`);
+  };
+
+  const handleUndoLastWaypoint = () => {
+    if (waypoints.length === 0) return;
+
+    setWaypoints((prev) => prev.slice(0, -1));
+
+    setShowUndo(false);
+    setUndoTimeLeft(5);
+
+    if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+
+    console.log("↩️ Last waypoint undone");
+  };
+
+  const exportAsJSON = async (
+    waypointsData = waypoints,
+    trackingData = trackingPoints,
+    name = "stage"
+  ) => {
+    try {
+      console.log("🔍 Starting Enhanced JSON export (iPad compatible)...");
+
+      const voiceWaypoints = waypointsData.filter(
+        (wp) => wp.voiceCreated
+      ).length;
+      const categories = waypointsData.reduce((acc, wp) => {
+        acc[wp.category || "general"] =
+          (acc[wp.category || "general"] || 0) + 1;
+        return acc;
+      }, {});
+
+      const data = {
+        metadata: {
+          routeName: routeName || name,
+          stageName: stageName,
+          exportDate: new Date().toISOString(),
+          appVersion: "RallyMapper-Voice-v2.0",
+          totalWaypoints: waypointsData.length,
+          voiceWaypoints: voiceWaypoints,
+          manualWaypoints: waypointsData.length - voiceWaypoints,
+          totalDistance:
+            waypointsData.length > 0
+              ? waypointsData[waypointsData.length - 1].distance
+              : 0,
+          categories: categories,
+          hasTracking: trackingData.length > 0,
+          trackingPoints: trackingData.length,
+        },
+        waypoints: waypointsData.map((wp, index) => ({
+          id: index + 1,
+          name: wp.name,
+          coordinates: { lat: wp.lat, lon: wp.lon, accuracy: gpsAccuracy },
+          timing: { timestamp: wp.timestamp, distanceFromStart: wp.distance },
+          classification: {
+            category: wp.category || "general",
+            priority: mapCategoryToStandardIcon(
+              wp.category || "general",
+              wp.name
+            ).priority,
+            rallyIcon: mapCategoryToStandardIcon(
+              wp.category || "general",
+              wp.name
+            ).icon,
+          },
+          creation: {
+            method: wp.voiceCreated ? "voice" : "manual",
+            rawTranscript: wp.rawTranscript || null,
+            processedText: wp.processedText || wp.name,
+            speedContext: wp.speedContext || null,
+          },
+          notes: wp.poi || null,
+        })),
+        tracking: {
+          enabled: trackingData.length > 0,
+          points: trackingData,
+          interval: "20_seconds",
+          totalPoints: trackingData.length,
+        },
+        compatibility: {
+          rallyNavigator: true,
+          googleEarth: true,
+          garminDevices: true,
+          hema: true,
+          standardGPX: true,
+        },
+      };
+
+      const content = JSON.stringify(data, null, 2);
+      const result = await exportFileIPadCompatible(
+        content,
+        `${name}-enhanced.json`,
+        "application/json",
+        "Rally Mapper Enhanced JSON"
+      );
+
+      console.log("Enhanced JSON export result:", result);
+      return result;
+    } catch (error) {
+      console.error("❌ Enhanced JSON export failed:", error);
+      throw error;
+    }
+  };
+
+  const exportAsSimpleJSON = async (
+    waypointsData = waypoints,
+    trackingData = trackingPoints,
+    name = "stage"
+  ) => {
+    try {
+      console.log("🔍 Starting Simple JSON export (iPad compatible)...");
+
+      const data = {
+        name: routeName || name,
+        stageName: stageName,
+        date: new Date().toISOString(),
+        waypoints: waypointsData.map((wp, index) => ({
+          name: wp.name,
+          lat: wp.lat,
+          lon: wp.lon,
+          distance: wp.distance,
+          timestamp: wp.timestamp,
+          description: wp.name + (wp.voiceCreated ? " (Voice)" : ""),
+        })),
+        track:
+          trackingData.length > 0
+            ? {
+                name: `${name} Track`,
+                points: trackingData.map((pt) => ({
+                  lat: pt.lat,
+                  lon: pt.lon,
+                  timestamp: pt.timestamp,
+                })),
+              }
+            : null,
+      };
+
+      const content = JSON.stringify(data, null, 2);
+      const result = await exportFileIPadCompatible(
+        content,
+        `${name}-simple.json`,
+        "application/json",
+        "Rally Mapper Simple JSON"
+      );
+
+      console.log("Simple JSON export result:", result);
+      return result;
+    } catch (error) {
+      console.error("❌ Simple JSON export failed:", error);
+      throw error;
+    }
+  };
+
+  const exportAsGPX = async (
+    waypointsData = waypoints,
+    trackingData = trackingPoints,
+    name = "route"
+  ) => {
+    try {
+      console.log("🔍 Starting GPX export (iPad compatible)...");
+
+      const gpxContent = buildGPX(waypointsData, trackingData, name);
+      console.log("🔍 GPX content length:", gpxContent.length);
+
+      const result = await exportFileIPadCompatible(
+        gpxContent,
+        `${name}.gpx`,
+        "application/gpx+xml",
+        "Rally Mapper GPX Export"
+      );
+
+      console.log("GPX export result:", result);
+      return result;
+    } catch (error) {
+      console.error("❌ GPX export failed:", error);
+      throw error;
+    }
+  };
+
+  const exportAsRallyNavigatorGPX = async (
+    waypointsData = waypoints,
+    trackingData = trackingPoints,
+    name = "route"
+  ) => {
+    try {
+      console.log(
+        "🔍 Starting Rally Navigator GPX export (iPad compatible)..."
+      );
+
+      const rallyGPX = `<?xml version="1.0" encoding="UTF-8"?>
+  <gpx version="1.1" creator="RallyMapper-Voice" xmlns="http://www.topografix.com/GPX/1/1">
+    <metadata>
+      <n>${name}</n>
+      <desc>Rally route with voice instructions - ${
+        waypointsData.length
+      } waypoints</desc>
+      <time>${new Date().toISOString()}</time>
+    </metadata>
+    
+    <!-- Waypoints with Rally Navigator friendly format -->
+    ${waypointsData
+      .map((wp, index) => {
+        const waypointNumber = (index + 1).toString().padStart(3, "0");
+        return `
+    <wpt lat="${wp.lat}" lon="${wp.lon}">
+      <n>${waypointNumber} - ${wp.name}</n>
+      <desc>${wp.name}</desc>
+      <cmt>Rally instruction: ${wp.name} at ${wp.distance}km</cmt>
+      <type>waypoint</type>
+    </wpt>`;
+      })
+      .join("")}
+  
+    <!-- Route with turn instructions -->
+    <rte>
+      <n>${name} Instructions</n>
+      <desc>Rally route with ${waypointsData.length} instruction points</desc>
+      ${waypointsData
+        .map((wp, index) => {
+          const waypointNumber = (index + 1).toString().padStart(3, "0");
+          return `
+      <rtept lat="${wp.lat}" lon="${wp.lon}">
+        <n>${waypointNumber} - ${wp.name}</n>
+        <desc>${wp.name}</desc>
+        <cmt>${wp.name}</cmt>
+      </rtept>`;
+        })
+        .join("")}
+    </rte>
+  
+    ${
+      trackingData.length > 0
         ? `
+    <!-- GPS Track -->
     <trk>
-      <name>${name} - Auto Track</name>
+      <n>${name} Track</n>
       <trkseg>
-        ${trackingPoints
+        ${trackingData
           .map(
             (pt) => `
         <trkpt lat="${pt.lat}" lon="${pt.lon}">
-          <time>${pt.timestamp}</time>
+          <time>${pt.timestamp || new Date().toISOString()}</time>
         </trkpt>`
           )
           .join("")}
       </trkseg>
     </trk>`
-        : "";
-
-    const gpxFooter = `
+        : ""
+    }
   </gpx>`;
 
-    return gpxHeader + waypointEntries + trackingSegment + gpxFooter;
+      const result = await exportFileIPadCompatible(
+        rallyGPX,
+        `${name}.gpx`,
+        "application/gpx+xml",
+        "Rally Mapper GPX Export"
+      );
+
+      console.log("Rally Navigator GPX export result:", result);
+      return result;
+    } catch (error) {
+      console.error("❌ Rally Navigator GPX export failed:", error);
+      throw error;
+    }
+  };
+
+  const exportAsKML = async (
+    waypointsData = waypoints,
+    trackingData = trackingPoints,
+    name = "route"
+  ) => {
+    try {
+      console.log("🔍 Starting KML export (iPad compatible)...");
+
+      const kmlContent = buildKML(waypointsData, trackingData, name);
+      const result = await exportFileIPadCompatible(
+        kmlContent,
+        `${name}.kml`,
+        "application/vnd.google-earth.kml+xml",
+        "Rally Mapper KML Export"
+      );
+
+      console.log("KML export result:", result);
+      return result;
+    } catch (error) {
+      console.error("❌ KML export failed:", error);
+      throw error;
+    }
+  };
+
+  const handleEndstage = async () => {
+    try {
+      setstageStarted(false);
+      setUndoTimeLeft(5);
+      setIsFollowingGPS(true);
+
+      const stageNameFormatted = `${todayDate}/Stage ${stageCount}`;
+      const currentstage = { name: stageNameFormatted, waypoints };
+
+      const summary = {
+        name: stageNameFormatted,
+        waypointCount: waypoints.length,
+        startTime: waypoints[0]?.timestamp || "N/A",
+        endTime: waypoints[waypoints.length - 1]?.timestamp || "N/A",
+        totalDistance: waypoints
+          .reduce((sum, wp) => sum + parseFloat(wp.distance || 0), 0)
+          .toFixed(2),
+        pois: [...new Set(waypoints.map((wp) => wp.poi).filter(Boolean))],
+        startCoords: waypoints[0]
+          ? `${waypoints[0].lat.toFixed(5)}, ${waypoints[0].lon.toFixed(5)}`
+          : "N/A",
+        endCoords: waypoints[waypoints.length - 1]
+          ? `${waypoints[waypoints.length - 1].lat.toFixed(5)}, ${waypoints[
+              waypoints.length - 1
+            ].lon.toFixed(5)}`
+          : "N/A",
+        routeName: routeName || "Unnamed Route",
+      };
+
+      setstage((prev) => [...prev, currentstage]);
+      setstageSummaries((prev) => [...prev, summary]);
+
+      setGpsError("📤 Exporting files (iPad compatible)...");
+
+      const exportName = routeName || stageNameFormatted;
+
+      console.log("🔍 === MAIN EXPORT PROCESS START ===");
+      console.log("Export name:", exportName);
+      console.log("Waypoints:", waypoints.length);
+      console.log("Tracking points:", trackingPoints.length);
+
+      // SUPABASE INTEGRATION (if user is logged in)
+      if (user && user !== "guest") {
+        try {
+          setSyncStatus("syncing");
+
+          let routeId = localStorage.getItem("current_route_id");
+          if (!routeId) {
+            const route = await dataSync.saveRoute({
+              routeName: routeName || `Day ${currentDay} Route ${currentRoute}`,
+              dayNumber: currentDay,
+              routeNumber: currentRoute,
+              surveyDate: todayDate,
+            });
+            routeId = route.id;
+            localStorage.setItem("current_route_id", routeId);
+          }
+
+          const stageData = await dataSync.saveStage(
+            {
+              stageName: stageNameFormatted,
+              stageNumber: stageCount,
+              startGPS: startGPS,
+              startTime: waypoints[0]?.fullTimestamp,
+              waypoints: waypoints,
+            },
+            routeId
+          );
+
+          if (trackingPoints.length > 0 && stageData?.id) {
+            await dataSync.saveTrackingPoints(trackingPoints, stageData.id);
+          }
+
+          setSyncStatus("synced");
+          console.log("✅ Data saved to Supabase");
+        } catch (error) {
+          console.error("Supabase save failed:", error);
+          setSyncStatus("error");
+        }
+      }
+
+      // Export files locally
+      const exportResults = [];
+
+      try {
+        console.log("📤 Starting sequential exports...");
+
+        const json1 = await exportAsJSON(waypoints, trackingPoints, exportName);
+        exportResults.push(json1);
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        const json2 = await exportAsSimpleJSON(
+          waypoints,
+          trackingPoints,
+          exportName
+        );
+        exportResults.push(json2);
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        const gpx = await exportAsGPX(waypoints, trackingPoints, exportName);
+        exportResults.push(gpx);
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        const kml = await exportAsKML(waypoints, trackingPoints, exportName);
+        exportResults.push(kml);
+
+        console.log("📤 All sequential exports completed");
+      } catch (error) {
+        console.error("❌ Sequential export failed:", error);
+      }
+
+      const successCount = exportResults.filter((r) => r && r.success).length;
+
+      console.log("🔍 Export results:", exportResults);
+      console.log("🔍 === MAIN EXPORT PROCESS END ===");
+
+      if (successCount === exportResults.length) {
+        setGpsError("✅ All 4 files exported successfully!");
+      } else if (successCount > 0) {
+        const formatNames = ["Enhanced JSON", "Simple JSON", "GPX", "KML"];
+        const successful = exportResults
+          .map((result, i) => (result?.success ? formatNames[i] : null))
+          .filter(Boolean);
+        const failed = exportResults
+          .map((result, i) => (!result?.success ? formatNames[i] : null))
+          .filter(Boolean);
+
+        setGpsError(
+          `⚠️ ${successCount}/${
+            exportResults.length
+          } files exported.\n✅ ${successful.join(", ")}\n❌ ${failed.join(
+            ", "
+          )}`
+        );
+      } else {
+        setGpsError("❌ All exports failed. Check console for details.");
+      }
+
+      setTimeout(() => setGpsError(null), 10000);
+
+      setRefreshKey((prev) => prev + 1);
+      setIsTracking(false);
+      localStorage.removeItem("unsavedWaypoints");
+
+      if (waypoints.length === 0) {
+        localStorage.removeItem("current_route_id");
+      }
+
+      console.log("Stage ended and exports completed.");
+    } catch (error) {
+      console.error("❌ handleEndstage error:", error);
+      setGpsError("❌ Stage end failed. Check console.");
+      setTimeout(() => setGpsError(null), 5000);
+    }
+  };
+
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Loading Rally Mapper...</p>
+        </div>
+      </div>
+    );
   }
 
-  const exportAsKML = (waypoints, name = "route") => {
-    const kmlContent = buildKML(waypoints, name);
-    const blob = new Blob([kmlContent], {
-      type: "application/vnd.google-earth.kml+xml",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${name}.kml`;
-    a.click();
-    URL.revokeObjectURL(url);
+  if (gpsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-pulse rounded-full h-12 w-12 bg-blue-600 mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Acquiring GPS signal...</p>
+          <p className="text-sm text-gray-500">
+            Please ensure location services are enabled
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const routePath = waypoints.map((wp) => ({
+    lat: wp.lat,
+    lng: wp.lon,
+  }));
+
+  const routeDistance =
+    waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0;
+  const routeStats = {
+    totalWaypoints: waypoints.length,
+    routeDistance: routeDistance,
+    avgSpeed:
+      isTracking && trackingPoints.length > 1
+        ? (
+            routeDistance /
+            ((Date.now() - new Date(trackingPoints[0].timestamp).getTime()) /
+              3600000)
+          ).toFixed(1)
+        : 0,
+    duration:
+      trackingPoints.length > 0
+        ? (
+            (Date.now() - new Date(trackingPoints[0].timestamp).getTime()) /
+            60000
+          ).toFixed(1)
+        : 0,
   };
 
-  const handleEndSection = () => {
-    setSectionStarted(false);
-    const sectionNameFormatted = `${todayDate}/Section ${sectionCount}`;
-    const currentSection = { name: sectionNameFormatted, waypoints };
+  const mapTypes = [
+    { key: "roadmap", label: "Road", icon: "🗺️" },
+    { key: "satellite", label: "Satellite", icon: "🛰️" },
+    { key: "terrain", label: "Terrain", icon: "⛰️" },
+    { key: "hybrid", label: "Hybrid", icon: "🔀" },
+  ];
 
-    const summary = {
-      name: sectionNameFormatted,
-      waypointCount: waypoints.length,
-      startTime: waypoints[0]?.timestamp || "N/A",
-      endTime: waypoints[waypoints.length - 1]?.timestamp || "N/A",
-      totalDistance: waypoints
-        .reduce((sum, wp) => sum + parseFloat(wp.distance || 0), 0)
-        .toFixed(2),
-      pois: [...new Set(waypoints.map((wp) => wp.poi).filter(Boolean))],
-      startCoords: waypoints[0]
-        ? `${waypoints[0].lat.toFixed(5)}, ${waypoints[0].lon.toFixed(5)}`
-        : "N/A",
-      endCoords: waypoints[waypoints.length - 1]
-        ? `${waypoints[waypoints.length - 1].lat.toFixed(5)}, ${waypoints[
-            waypoints.length - 1
-          ].lon.toFixed(5)}`
-        : "N/A",
-      routeName: routeName || "Unnamed Route",
-    };
+  const GPSStatus = () => {
+    if (gpsError) {
+      return (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="flex items-center">
+            <span className="text-red-500 mr-2">⚠️</span>
+            <div className="flex-1">
+              <strong>GPS Error:</strong> {gpsError}
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="ml-2 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
 
-    setSections((prev) => [...prev, currentSection]);
+    if (gpsLoading || !currentGPS?.lat || !currentGPS?.lon) {
+      return (
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+          <div className="flex items-center">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600 mr-2"></div>
+            <span>Acquiring GPS signal... Please wait.</span>
+          </div>
+        </div>
+      );
+    }
 
-    setSectionSummaries((prev) => [...prev, summary]);
-    exportAsJSON(waypoints, routeName || sectionNameFormatted);
-    exportAsGPX(waypoints, routeName || sectionNameFormatted);
-    exportAsKML(waypoints, routeName || sectionNameFormatted);
-    //setSectionCount((prev) => prev + 1);
-    //setWaypoints([]);
-    //setSectionName(`Section ${sectionCount + 1}`);
-    setRefreshKey((prev) => prev + 1);
-    setIsTracking(false);
-    localStorage.removeItem("unsavedWaypoints");
-
-    // ✅ Confirm to console
-    console.log("Section ended and unsaved waypoints cleared.");
-    // Optional: export trackingPoints separately if needed
-    console.log("Tracking points recorded:", trackingPoints);
+    return (
+      <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <span className="text-green-500 mr-2">📍</span>
+            <span>GPS Active</span>
+          </div>
+          <div className="text-sm">
+            <span className="mr-3">
+              {currentGPS.lat.toFixed(6)}, {currentGPS.lon.toFixed(6)}
+            </span>
+            Accuracy: ±{gpsAccuracy ? Math.round(gpsAccuracy) : "?"}m
+            <span
+              className={`ml-2 px-2 py-1 rounded text-xs ${
+                gpsAccuracy <= 10
+                  ? "bg-green-200 text-green-800"
+                  : gpsAccuracy <= 50
+                  ? "bg-yellow-200 text-yellow-800"
+                  : "bg-red-200 text-red-800"
+              }`}
+            >
+              {gpsAccuracy <= 10
+                ? "Excellent"
+                : gpsAccuracy <= 50
+                ? "Good"
+                : "Poor"}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
   };
 
-  //import React, { useEffect, useRef, useState } from "react";
-  // ... other imports remain unchanged
+  const WaypointSuccessNotification = () => {
+    if (!waypointAdded) return null;
 
-  //export default function App() {
-  // ... all your useState and useEffect hooks remain unchanged
+    return (
+      <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce">
+        <div className="flex items-center">
+          <span className="text-xl mr-2">✅</span>
+          <span>Waypoint Added!</span>
+        </div>
+      </div>
+    );
+  };
+
+  const StartstageConfirmDialog = () => {
+    if (!showStartstageConfirm) return null;
+
+    return (
+      <div
+        style={{
+          position: "fixed",
+          top: "0",
+          left: "0",
+          right: "0",
+          bottom: "0",
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: "999",
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: "white",
+            borderRadius: "8px",
+            padding: "24px",
+            width: "320px",
+            maxWidth: "90vw",
+            boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
+            margin: "20px",
+          }}
+        >
+          <h3
+            style={{
+              fontSize: "1.125rem",
+              fontWeight: "bold",
+              color: "#1F2937",
+              marginBottom: "16px",
+            }}
+          >
+            Start New stage?
+          </h3>
+          <p
+            style={{
+              color: "#6B7280",
+              marginBottom: "24px",
+              lineHeight: "1.5",
+            }}
+          >
+            This will clear your current {waypoints.length} waypoint
+            {waypoints.length !== 1 ? "s" : ""} and start fresh. Make sure
+            you've exported your current data first.
+          </p>
+          <div style={{ display: "flex", gap: "12px" }}>
+            <button
+              onClick={() => setShowStartstageConfirm(false)}
+              style={{
+                flex: "1",
+                padding: "10px 16px",
+                backgroundColor: "#D1D5DB",
+                color: "#374151",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "500",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowStartstageConfirm(false);
+                handleStartstage();
+              }}
+              style={{
+                flex: "1",
+                padding: "10px 16px",
+                backgroundColor: "#DC2626",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "500",
+              }}
+            >
+              Start New stage
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const EndstageConfirmDialog = () => {
+    if (!showEndstageConfirm) return null;
+
+    return (
+      <div
+        style={{
+          position: "fixed",
+          top: "0",
+          left: "0",
+          right: "0",
+          bottom: "0",
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: "999",
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: "white",
+            borderRadius: "8px",
+            padding: "24px",
+            width: "320px",
+            maxWidth: "90vw",
+            boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
+            margin: "20px",
+          }}
+        >
+          <h3
+            style={{
+              fontSize: "1.125rem",
+              fontWeight: "bold",
+              color: "#1F2937",
+              marginBottom: "16px",
+            }}
+          >
+            End stage?
+          </h3>
+          <p
+            style={{
+              color: "#6B7280",
+              marginBottom: "24px",
+              lineHeight: "1.5",
+            }}
+          >
+            This will export your route data and clear current waypoints. This
+            action cannot be undone.
+          </p>
+          <div style={{ display: "flex", gap: "12px" }}>
+            <button
+              onClick={() => setShowEndstageConfirm(false)}
+              style={{
+                flex: "1",
+                padding: "10px 16px",
+                backgroundColor: "#D1D5DB",
+                color: "#374151",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "500",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowEndstageConfirm(false);
+                handleEndstage();
+              }}
+              style={{
+                flex: "1",
+                padding: "10px 16px",
+                backgroundColor: "#DC2626",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "500",
+              }}
+            >
+              End stage
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const MapControls = () => (
+    <>
+      <div
+        style={{ position: "absolute", top: "8px", left: "8px", zIndex: 10 }}
+      >
+        <div className="bg-white rounded-lg shadow-lg p-2">
+          <div className="grid grid-cols-4 gap-1">
+            {mapTypes.map((type) => (
+              <button
+                key={type.key}
+                onClick={() => setMapType(type.key)}
+                className={`px-2 py-1 text-xs rounded transition-colors ${
+                  mapType === type.key
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                }`}
+              >
+                <span className="mr-1">{type.icon}</span>
+                {type.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{ position: "absolute", top: "8px", right: "8px", zIndex: 10 }}
+      >
+        <button
+          onClick={() => setShowRouteStats(!showRouteStats)}
+          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            showRouteStats
+              ? "bg-blue-500 text-white"
+              : "bg-white text-gray-700 hover:bg-gray-100"
+          } shadow-lg`}
+        >
+          📊 Stats
+        </button>
+      </div>
+    </>
+  );
+
+  const RouteStatsOverlay = () => {
+    if (!showRouteStats || waypoints.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="absolute bottom-4 left-4 bg-white bg-opacity-95 rounded-lg shadow-lg p-4 z-50 min-w-48">
+        <h3 className="font-bold text-gray-800 mb-2">Route Statistics</h3>
+        <div className="space-y-1 text-sm text-gray-600">
+          <div className="flex justify-between">
+            <span>Waypoints:</span>
+            <span className="font-medium">{routeStats.totalWaypoints}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Distance:</span>
+            <span className="font-medium">{routeStats.routeDistance} km</span>
+          </div>
+          {isTracking && (
+            <>
+              <div className="flex justify-between">
+                <span>Duration:</span>
+                <span className="font-medium">{routeStats.duration} min</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Avg Speed:</span>
+                <span className="font-medium">{routeStats.avgSpeed} km/h</span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="p-4">
+      {/* Sync Status Indicator */}
+      <div className="fixed top-4 right-4 z-50">
+        <div
+          className={`px-3 py-1 rounded-full text-sm ${
+            syncStatus === "synced"
+              ? "bg-green-100 text-green-800"
+              : syncStatus === "syncing"
+              ? "bg-yellow-100 text-yellow-800"
+              : syncStatus === "error"
+              ? "bg-red-100 text-red-800"
+              : "bg-gray-100 text-gray-800"
+          }`}
+        >
+          {syncStatus === "synced"
+            ? "☁️ Saved"
+            : syncStatus === "syncing"
+            ? "🔄 Syncing..."
+            : syncStatus === "error"
+            ? "⚠️ Sync Error"
+            : "💾 Local Only"}
+        </div>
+        {user !== "guest" && (
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="mt-2 text-xs text-gray-500 hover:text-gray-700"
+          >
+            Sign Out
+          </button>
+        )}
+      </div>
+
+      <WaypointSuccessNotification />
+      <EndstageConfirmDialog />
+      <StartstageConfirmDialog />
+
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold text-blue-800 flex items-center gap-2">
           <img src="/RRM Logo 64x64.png" className="w-8 h-8" alt="RRM Logo" />
@@ -543,217 +2604,720 @@ export default function App() {
         </h1>
       </div>
 
+      <GPSStatus />
+
       <div className="flex gap-4 mb-4">
         <button
-          className="bg-gray-700 text-white px-4 py-2 rounded"
+          className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700 text-sm"
           onClick={() => setShowMap((prev) => !prev)}
         >
           {showMap ? "Hide Map" : "Show Map"}
         </button>
         <button
-          className="bg-gray-700 text-white px-4 py-2 rounded"
+          className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700 text-sm"
           onClick={() => setFullScreenMap((prev) => !prev)}
         >
           {fullScreenMap ? "Exit Full Screen" : "Full Screen Map"}
+        </button>
+        <button
+          onClick={() => setShowReplay((prev) => !prev)}
+          className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700 text-sm"
+        >
+          {showReplay ? "Hide" : "Show"} Route Replay
+        </button>
+
+        {showReplay && <ReplayRoute waypoints={waypoints} />}
+
+        <button
+          onClick={recenterOnGPS}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg ${
+            isFollowingGPS
+              ? "bg-brown-600 text-white hover:bg-blue-700"
+              : "bg-orange-600 text-white hover:bg-orange-700"
+          }`}
+          title={isFollowingGPS ? "Following GPS" : "Click to re-center on GPS"}
+        >
+          📍 {isFollowingGPS ? "Following GPS" : "Re-center"}
         </button>
       </div>
 
       {showMap && (
         <div
-          className={
-            fullScreenMap ? "relative h-[80vh]" : "relative h-[260px] mb-4"
-          }
+          className={`relative w-full mb-2 ${
+            fullScreenMap ? "h-screen" : "h-[200px]"
+          }`}
         >
-          {isLoaded && (
+          {isLoaded && currentGPS && (
             <>
+              <MapControls />
+              <RouteStatsOverlay />
+
               <GoogleMap
+                key={refreshKey}
                 mapContainerStyle={{ width: "100%", height: "100%" }}
                 center={mapCenter}
-                zoom={14}
+                zoom={mapZoom}
+                mapTypeId={mapType}
+                onDragStart={handleMapDragStart}
+                onDragEnd={handleMapDragEnd}
+                onZoomChanged={(e) => {
+                  const map = e || this;
+                  handleMapZoomChanged(map);
+                }}
+                options={{
+                  zoomControl: true,
+                  mapTypeControl: false,
+                  streetViewControl: false,
+                  fullscreenControl: true,
+                  gestureHandling: "greedy",
+                  disableDefaultUI: false,
+                }}
+                onLoad={(map) => {
+                  console.log("Map loaded");
+                  window.rallyMap = map;
+                }}
               >
-                {startGPS && (
-                  <Marker
-                    position={{ lat: startGPS.lat, lng: startGPS.lon }}
-                    icon={{
-                      url: "/icons/start-flag.svg",
-                      scaledSize: new window.google.maps.Size(32, 32),
+                <Marker
+                  position={{ lat: currentGPS.lat, lng: currentGPS.lon }}
+                  icon={{
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 10,
+                    fillColor: "#4285F4",
+                    fillOpacity: 1,
+                    strokeColor: "#ffffff",
+                    strokeWeight: 3,
+                  }}
+                  title="Current Location"
+                />
+
+                {gpsAccuracy && (
+                  <Circle
+                    center={{ lat: currentGPS.lat, lng: currentGPS.lon }}
+                    radius={gpsAccuracy}
+                    options={{
+                      fillColor: isFollowingGPS ? "#4285F4" : "#FF6B35",
+                      fillOpacity: 0.1,
+                      strokeColor: isFollowingGPS ? "#4285F4" : "#FF6B35",
+                      strokeOpacity: 0.3,
+                      strokeWeight: 1,
                     }}
                   />
                 )}
-                {currentGPS && (
-                  <Marker
-                    position={{ lat: currentGPS.lat, lng: currentGPS.lon }}
-                    icon={{
-                      url: "/icons/dot.svg",
-                      scaledSize: new window.google.maps.Size(24, 24),
+
+                {waypoints.map((wp, index) => {
+                  if (!wp.lat || !wp.lon) {
+                    console.warn(
+                      `⚠️ Skipping invalid waypoint at index ${index}`,
+                      wp
+                    );
+                    return null;
+                  }
+
+                  return (
+                    <Marker
+                      key={index}
+                      position={{ lat: wp.lat, lng: wp.lon }}
+                      onClick={() => {
+                        setSelectedWaypoint(index);
+                      }}
+                      label={{
+                        text: (index + 1).toString(),
+                        color: "white",
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                      }}
+                    />
+                  );
+                })}
+
+                {routePath.length > 1 && (
+                  <Polyline
+                    path={routePath}
+                    options={{
+                      strokeColor: "#FF0000",
+                      strokeOpacity: 0.8,
+                      strokeWeight: 4,
+                      geodesic: true,
                     }}
                   />
+                )}
+
+                {trackingPoints.length > 1 && (
+                  <Polyline
+                    path={trackingPoints.map((pt) => ({
+                      lat: pt.lat,
+                      lng: pt.lon,
+                    }))}
+                    options={{
+                      strokeColor: "#00FF00",
+                      strokeOpacity: 0.6,
+                      strokeWeight: 2,
+                      geodesic: true,
+                    }}
+                  />
+                )}
+
+                {selectedWaypoint !== null && waypoints[selectedWaypoint] && (
+                  <InfoWindow
+                    position={{
+                      lat: waypoints[selectedWaypoint].lat,
+                      lng: waypoints[selectedWaypoint].lon,
+                    }}
+                    onCloseClick={() => setSelectedWaypoint(null)}
+                  >
+                    <div className="p-2 max-w-xs">
+                      <div className="flex items-center mb-2">
+                        <strong className="text-lg">
+                          {waypoints[selectedWaypoint].name}
+                        </strong>
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <div>
+                          <strong>Time:</strong>{" "}
+                          {waypoints[selectedWaypoint].timestamp}
+                        </div>
+                        <div>
+                          <strong>Position:</strong>{" "}
+                          {waypoints[selectedWaypoint].lat.toFixed(6)},{" "}
+                          {waypoints[selectedWaypoint].lon.toFixed(6)}
+                        </div>
+                        <div>
+                          <strong>Distance from start:</strong>{" "}
+                          {waypoints[selectedWaypoint].distance} km
+                        </div>
+                        {waypoints[selectedWaypoint].poi && (
+                          <div>
+                            <strong>Notes:</strong>{" "}
+                            {waypoints[selectedWaypoint].poi}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </InfoWindow>
                 )}
               </GoogleMap>
             </>
           )}
         </div>
       )}
+
       <p></p>
-      {/* Route Info */}
+
       <div>
         <h2 className="text-lg font-semibold mb-2">
-          📝 Route Info: {todayDate}
+          📝 Survey Trip: Day {currentDay} - {todayDate}
         </h2>
         <div className="flex flex-wrap gap-2 mb-2">
-          <input
-            className="flex-1 p-2 rounded bg-gray-100"
-            placeholder="Route Name"
-            value={routeName}
-            onChange={(e) => setRouteName(e.target.value)}
-          />
-          <input
-            className="p-2 border rounded"
-            placeholder="Section Number"
-            value={sectionName}
-            onChange={(e) => setSectionName(e.target.value)}
-          />
-          <button
-            className="bg-red-600 text-white px-4 py-2 rounded"
-            onClick={handleStartSection}
-          >
-            ▶️ Start Section
-          </button>
-          <button
-            className="bg-red-600 text-white px-4 py-2 rounded"
-            onClick={handleEndSection}
-          >
-            ⏹ End Section
-          </button>
+          <div className="flex flex-col justify-end">
+            <div className="flex items-center gap-3">
+              <span className="px-3 py-2 bg-blue-100 border rounded text-center font-bold min-w-16">
+                Day {currentDay}
+              </span>
+              <button
+                className="bg-blue-600 text-white px-2 py-2 rounded text-sm hover:bg-blue-700"
+                onClick={handleNewDay}
+                title="Start new day"
+              >
+                📅 New Day
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col justify-end">
+            <button
+              className="bg-brown-600 text-white px-3 py-2 rounded hover:bg-green-700 text-sm"
+              onClick={handleNewRoute}
+              title="Start new route"
+            >
+              🗺️ New Route
+            </button>
+          </div>
+
+          <div className="flex flex-col flex-1">
+            <input
+              className="flex-1 p-2 border rounded text-black bg-gray-100 text-sm"
+              placeholder={`Day ${currentDay} - Route ${currentRoute}`}
+              value={routeName}
+              onChange={(e) => setRouteName(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <input
+              className="p-2 border rounded text-sm"
+              placeholder="Stage Number"
+              value={stageName}
+              onChange={(e) => setstageName(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col justify-end">
+            {!stageStarted ? (
+              <button
+                className="bg-green-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+                onClick={() => {
+                  if (waypoints.length > 0) {
+                    setShowStartstageConfirm(true);
+                  } else {
+                    handleStartstage();
+                  }
+                }}
+                disabled={stageLoading || !currentGPS}
+              >
+                {stageLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Starting...
+                  </>
+                ) : (
+                  <>▶️ Start Stage</>
+                )}
+              </button>
+            ) : (
+              <button
+                className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-red-600 disabled:cursor-not-allowed text-sm"
+                onClick={() => setShowEndstageConfirm(true)}
+                disabled={waypoints.length === 0}
+              >
+                ⏹ End Stage
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Waypoint Entry */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          {/* Left-aligned heading */}
-          <h2 className="text-lg font-semibold">📍 Waypoint Entry</h2>
-
-          {/* Centered button + meter container */}
-          <div className="flex justify-center items-center gap-8 mx-auto">
-            {/* Add Waypoint Button */}
-            <button
-              onClick={handleAddWaypoint}
-              disabled={!currentGPS}
-              style={{ color: "#16a34a", fontWeight: "800" }} // text-green-600 fallback
-              className="flex flex-col items-center justify-center w-40 h-24 bg-white border-4 border-blue-900 rounded-md px-6 py-4 text-green-600 font-extrabold text-2xl text-center leading-tight transition-transform transform active:scale-95"
+        <div className="flex justify-center items-center gap-4 my-4 flex-wrap">
+          <div
+            style={{
+              width: "128px",
+              height: "28px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "white",
+              border: "2px solid #1e3a8a",
+              borderRadius: "8px",
+              fontWeight: "bold",
+              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+              padding: "16px",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "1.5rem",
+                textAlign: "center",
+                lineHeight: "1.2",
+                padding: "8px",
+              }}
             >
-              ADD
-              <br />
-              WAYPOINT
-            </button>
-
-            {/* Distance Meter */}
-            <div className="flex flex-col items-center justify-center w-40 h-24 bg-white border-4 border-blue-900 text-black font-bold rounded shadow">
-              <span className="text-xs tracking-widest">KILOMETERS</span>
-              <span className="text-3xl">{totalDistance.toFixed(2)}</span>
-            </div>
-            {isTracking && (
-              <p className="text-green-600 font-bold animate-pulse mt-2">
-                📍 Tracking...
-              </p>
-            )}
+              {totalDistance.toFixed(2)} km
+            </span>
           </div>
+
+          <button
+            onClick={handleAddWaypoint}
+            type="button"
+            disabled={!currentGPS || !stageStarted}
+            style={{
+              padding: "18px 16px",
+              borderRadius: "8px",
+              fontSize: "1.0rem",
+              transition: "all 0.2s",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              backgroundColor:
+                !currentGPS || !stageStarted
+                  ? "#e98547"
+                  : waypointAdded
+                  ? "#059669"
+                  : "#16a34a",
+              color: "white",
+              cursor: !currentGPS || !stageStarted ? "not-allowed" : "pointer",
+              border: "2px solid #1e3a8a",
+            }}
+          >
+            {waypointAdded ? <>✅ Added!</> : <>📍 Add Waypoint</>}
+          </button>
+
+          {showUndo && (
+            <button
+              onClick={handleUndoLastWaypoint}
+              type="button"
+              style={{
+                padding: "18px 16px",
+                borderRadius: "8px",
+                fontSize: "1rem",
+                backgroundColor: "#EF4444",
+                color: "white",
+                border: "2px solid #1e3a8a",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+              }}
+            >
+              ↩️ Undo ({undoTimeLeft}s)
+            </button>
+          )}
+
+          <button
+            onClick={stageStarted ? startVoiceInput : handleGlobalVoiceCommands}
+            type="button"
+            disabled={!stageStarted}
+            style={{
+              padding: "18px 16px",
+              borderRadius: "8px",
+              fontSize: "1.00rem",
+              transition: "all 0.2s",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              backgroundColor: !stageStarted
+                ? "#e98547"
+                : recognitionActive
+                ? "#EF4444"
+                : "#16a34a",
+              color: "white",
+              cursor: !stageStarted ? "not-allowed" : "pointer",
+              border: "2px solid #1e3a8a",
+              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+            }}
+          >
+            {recognitionActive ? (
+              <>
+                <div className="w-4 h-4 bg-white rounded-full animate-pulse"></div>
+                Listening...
+              </>
+            ) : (
+              <>🎤 Add Location</>
+            )}
+          </button>
+
+          <ContinuousListeningButton />
+
+          <button
+            style={{
+              padding: "18px 16px",
+              borderRadius: "8px",
+              fontSize: "1.0rem",
+              backgroundColor: !stageStarted ? "#e98547" : "#D1D5DB",
+              color: "white",
+              border: "2px solid #1e3a8a",
+              cursor: !stageStarted ? "not-allowed" : "pointer",
+            }}
+            onClick={() => alert("Photo feature not yet implemented")}
+            type="button"
+            disabled={!stageStarted}
+          >
+            📷 Photo
+          </button>
+
+          {isTracking && (
+            <div className="flex items-center text-green-600 font-bold">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-ping mr-2"></div>
+              📍 Tracking...
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-10 gap-2 mb-4">
-          <div className="flex flex-wrap gap-5">
-            {Object.keys(iconCategories).map((category) => ((
-              <button
-                key={icon.name}
-                onClick={() => handleIconSelect(icon.name)}
-                className={`w-20 h-20 flex flex-col items-center justify-center border-2 rounded-lg transition transform hover:scale-105 active:scale-95 ${
-                  selectedIcon === icon.name
-                    ? "border-yellow-500 bg-yellow-100"
-                    : "border-gray-300 bg-white"
-                }`}
-              >
-                <img src={icon.src} alt={icon.name} className="w-8 h-8 mb-1" />
-                <p className="text-xs text-center font-medium">{icon.name}</p>
-              </button>
-            ))}
-          </div>
-
-        <textarea
-          placeholder="Point of Interest (POI)"
-          className="w-full border p-2 rounded mb-2"
-          value={poi}
-          onChange={(e) => setPoi(e.target.value)}
-        />
-        <button
-          className="bg-gray-300 hover:bg-gray-400 text-black px-3 py-1 rounded mt-2"
-          onClick={startVoiceInput}
-          type="button"
+        <div
+          style={{
+            display: "flex",
+            flexDirection: window.innerWidth >= 768 ? "row" : "column",
+            gap: "24px",
+            marginTop: "24px",
+          }}
         >
-          🎤 {recognitionActive ? "Listening..." : "Voice Input"}
-        </button>
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "8px",
+                minHeight: "32px",
+              }}
+            >
+              <h2 className="text-lg font-semibold">
+                🧭 Current Stage Waypoints
+              </h2>
 
-        {/* Waypoints List */}
-        <section className="mt-6">
-          <h2 className="text-lg font-semibold mb-2">
-            🧭 Current Section Waypoints
-          </h2>
-          <div
-            ref={waypointListRef}
-            className="max-h-[40vh] overflow-y-auto pr-1 space-y-2"
-          >
-            {waypoints.length === 0 ? (
-              <p className="text-gray-500">No waypoints added yet.</p>
-            ) : (
-              waypoints.map((wp, idx) => (
-                <div key={idx} className="bg-gray-100 p-3 rounded">
-                  <div className="flex items-center gap-2">
-                    <img src={wp.iconSrc} className="w-6 h-6" alt={wp.name} />
-                    <p className="font-semibold">{wp.name}</p>
-                  </div>
-                  <p className="text-sm text-gray-600">Time: {wp.timestamp}</p>
-                  <p className="text-sm text-gray-600">
-                    GPS: {wp.lat}, {wp.lon}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Distance: {wp.distance} km
-                  </p>
-                  {wp.poi && (
-                    <p className="text-sm text-gray-600">POI: {wp.poi}</p>
+              {waypoints.length > 0 && (
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                >
+                  {bulkSelectMode && (
+                    <>
+                      <span className="text-sm text-gray-600">
+                        {selectedWaypoints.size} selected
+                      </span>
+                      <button
+                        onClick={selectAllWaypoints}
+                        className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                      >
+                        {selectedWaypoints.size === waypoints.length
+                          ? "Deselect All"
+                          : "Select All"}
+                      </button>
+                      {selectedWaypoints.size > 0 && (
+                        <button
+                          onClick={deleteSelectedWaypoints}
+                          className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                        >
+                          Delete ({selectedWaypoints.size})
+                        </button>
+                      )}
+                    </>
                   )}
+                  <button
+                    onClick={toggleBulkSelectMode}
+                    className={`px-3 py-1 rounded text-sm ${
+                      bulkSelectMode
+                        ? "bg-gray-500 text-white hover:bg-gray-600"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    {bulkSelectMode ? "Exit Select" : "Select Multiple"}
+                  </button>
                 </div>
-              ))
-            )}
-          </div>
-        </section>
+              )}
+            </div>
 
-        <section className="mt-6">
-          <h2 className="text-lg font-semibold mb-2">📋 Section Summaries</h2>
-          {sectionSummaries.length === 0 ? (
-            <p className="text-gray-500">No sections completed yet.</p>
-          ) : (
-            sectionSummaries.map((summary, idx) => (
-              <div key={idx} className="bg-white shadow rounded p-3 mb-2">
-                <h3 className="font-bold text-blue-700">{summary.name}</h3>
-                {summary.routeName && (
-                  <p className="text-sm text-gray-600">
-                    Route: {summary.routeName}
-                  </p>
-                )}
-                <p>Waypoints: {summary.waypointCount}</p>
-                <p>Start GPS: {summary.startCoords}</p>
-                <p>End GPS: {summary.endCoords}</p>
-                <p>Start: {summary.startTime}</p>
-                <p>End: {summary.endTime}</p>
-                <p>Total Distance: {summary.totalDistance} km</p>
-                {summary.pois.length > 0 && (
-                  <p>POIs: {summary.pois.join(", ")}</p>
-                )}
-              </div>
-            ))
-          )}
-        </section>
+            <div
+              ref={waypointListRef}
+              style={{
+                maxHeight: "40vh",
+                overflowY: "auto",
+                paddingRight: "4px",
+              }}
+            >
+              {waypoints.length === 0 ? (
+                <p className="text-gray-500">No waypoints added yet.</p>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
+                  {waypoints.map((wp, idx) => (
+                    <div key={idx} className="bg-gray-100 p-3 rounded">
+                      {bulkSelectMode && (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            marginBottom: "8px",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedWaypoints.has(idx)}
+                            onChange={() => toggleWaypointSelection(idx)}
+                            style={{ marginRight: "8px" }}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm text-gray-600">
+                            Select for bulk operations
+                          </span>
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        {wp.voiceCreated ? (
+                          <div
+                            style={{
+                              width: "24px",
+                              height: "24px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginRight: "8px",
+                            }}
+                          >
+                            <span className="text-blue-500">🎤</span>
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              width: "24px",
+                              height: "24px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginRight: "8px",
+                            }}
+                          >
+                            <span className="text-gray-400">📍</span>
+                          </div>
+                        )}
+                        {editingWaypoint === idx ? (
+                          <div style={{ flex: 1, display: "flex", gap: "8px" }}>
+                            <input
+                              value={editValues.name}
+                              onChange={(e) =>
+                                setEditValues((prev) => ({
+                                  ...prev,
+                                  name: e.target.value,
+                                }))
+                              }
+                              onKeyDown={handleEditKeyPress}
+                              className="flex-1 px-2 py-1 border rounded text-sm"
+                              placeholder="Waypoint name"
+                              autoFocus
+                            />
+                            <button
+                              onClick={saveWaypointEdit}
+                              className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={cancelWaypointEdit}
+                              className="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600"
+                            >
+                              ✗
+                            </button>
+                          </div>
+                        ) : (
+                          <p
+                            className="font-semibold cursor-pointer hover:bg-yellow-100 px-1 rounded"
+                            onClick={() => startEditingWaypoint(idx)}
+                            title="Click to edit"
+                            style={{ flex: 1 }}
+                          >
+                            {wp.name}
+                          </p>
+                        )}
+                      </div>
+
+                      <p className="text-sm text-gray-600">
+                        Time: {wp.timestamp}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        GPS: {wp.lat.toFixed(6)}, {wp.lon.toFixed(6)}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Distance: {wp.distance} km
+                      </p>
+
+                      {editingWaypoint === idx ? (
+                        <div style={{ marginTop: "8px" }}>
+                          <textarea
+                            value={editValues.poi}
+                            onChange={(e) =>
+                              setEditValues((prev) => ({
+                                ...prev,
+                                poi: e.target.value,
+                              }))
+                            }
+                            onKeyDown={handleEditKeyPress}
+                            className="w-full px-2 py-1 border rounded text-sm"
+                            placeholder="POI notes (optional)"
+                            rows="2"
+                          />
+                        </div>
+                      ) : (
+                        wp.poi && (
+                          <p
+                            className="text-sm text-gray-600 cursor-pointer hover:bg-yellow-100 px-1 rounded"
+                            onClick={() => startEditingWaypoint(idx)}
+                            title="Click to edit"
+                            style={{ marginTop: "4px" }}
+                          >
+                            POI: {wp.poi}
+                          </p>
+                        )
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "8px",
+                minHeight: "32px",
+              }}
+            >
+              <h2 className="text-lg font-semibold">📋 Stage Summaries</h2>
+              {stageSummaries.length > 0 && (
+                <span className="text-sm text-gray-600 bg-gray-200 px-2 py-1 rounded">
+                  {stageSummaries.length} completed
+                </span>
+              )}
+            </div>
+            <div
+              style={{
+                maxHeight: "40vh",
+                overflowY: "auto",
+                paddingRight: "4px",
+              }}
+            >
+              {stageSummaries.length === 0 ? (
+                <p className="text-gray-500">No stages completed yet.</p>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
+                  {stageSummaries.map((summary, idx) => (
+                    <div key={idx} className="bg-white shadow rounded p-3">
+                      <h3 className="font-bold text-blue-700">
+                        {summary.name}
+                      </h3>
+                      {summary.routeName && (
+                        <p className="text-sm text-gray-600">
+                          Route: {summary.routeName}
+                        </p>
+                      )}
+                      <p>Waypoints: {summary.waypointCount}</p>
+                      <p>Start GPS: {summary.startCoords}</p>
+                      <p>End GPS: {summary.endCoords}</p>
+                      <p>Start: {summary.startTime}</p>
+                      <p>End: {summary.endTime}</p>
+                      <p>Total Distance: {summary.totalDistance} km</p>
+                      {summary.pois.length > 0 && (
+                        <p>POIs: {summary.pois.join(", ")}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+  );
+}
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+      </Routes>
+    </BrowserRouter>
   );
 }

@@ -14,8 +14,6 @@ import ReplayRoute from "./ReplayRoute";
 import { supabase } from "./lib/supabase";
 import { dataSync } from "./services/dataSync";
 import Auth from "./components/Auth";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import AuthCallback from "./routes/AuthCallback";
 
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -460,144 +458,188 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
 
 function buildKML(routeWaypoints = [], trackingPoints = [], name = "Route") {
   const kmlHeader = `<?xml version="1.0" encoding="UTF-8"?>
-  <kml xmlns="http://www.opengis.net/kml/2.2">`;
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${name}</name>
+    <description>Rally route - ${routeWaypoints.length} routeWaypoints</description>
+    
+    <!-- Waypoint Folder -->
+    <Folder>
+      <name>Waypoints</name>
+      <description>Rally routeWaypoints</description>`;
 
-  const placemarks = routeWaypoints
+  // Individual waypoint placemarks
+  const waypointPlacemarks = routeWaypoints
     .map(
-      (wp, i) => `
-        <Placemark>
-          <name>${wp.name || "WP " + (i + 1)}</name>
-          <description>${wp.description || ""}</description>
-          <Point>
-            <coordinates>${wp.lon},${wp.lat},0</coordinates>
-          </Point>
-        </Placemark>`
+      (wp, index) => `
+      <Placemark>
+        <name>WP${(index + 1).toString().padStart(2, "0")} ${wp.name}</name>
+        <description>${wp.name} - ${wp.distance}km${
+        wp.voiceCreated ? " (Voice)" : ""
+      }</description>
+        <Point>
+          <coordinates>${wp.lon},${wp.lat},0</coordinates>
+        </Point>
+      </Placemark>`
     )
     .join("");
 
-  const kmlFooter = `</kml>`;
-  return `${kmlHeader}<Document><name>${name}</name>${placemarks}</Document>${kmlFooter}`;
-}
+  const waypointFolderClose = `
+    </Folder>`;
 
-const exportFileIPadCompatible = async (
-  content,
-  filename,
-  mimeType,
-  title = "Rally Mapper Export"
-) => {
-  try {
-    console.log(`🔍 === STARTING EXPORT: ${filename} ===`);
-    console.log(`📄 Content length: ${content.length} characters`);
-    console.log(`📄 MIME type: ${mimeType}`);
-    console.log(`📄 File size: ${new Blob([content]).size} bytes`);
+  // Tracking folder
+  const trackingFolder =
+    trackingPoints.length > 0
+      ? `
+    <Folder>
+      <name>GPS Track</name>
+      <description>Auto-recorded GPS track</description>
+      <Placemark>
+        <name>${name} Track</name>
+        <description>GPS breadcrumbs - ${
+          trackingPoints.length
+        } points</description>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            ${trackingPoints
+              .map((pt) => `${pt.lon},${pt.lat},0`)
+              .join("\n            ")}
+          </coordinates>
+        </LineString>
+      </Placemark>
+    </Folder>`
+      : "";
 
-    const env = {
-      userAgent: navigator.userAgent,
-      platform: navigator.platform,
-      isIPad: /iPad|iPhone|iPod/.test(navigator.userAgent),
-      isPWA: window.navigator.standalone,
-      isIOSSafari:
-        /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
-      canShare: !!navigator.canShare,
-      canShareFiles: navigator.canShare
-        ? navigator.canShare({ files: [new File([""], "test.txt")] })
-        : false,
-      downloadSupport: "download" in document.createElement("a"),
-      blobSupport: !!window.Blob,
-      urlSupport: !!window.URL,
-    };
+  return (
+    kmlHeader +
+    waypointPlacemarks +
+    waypointFolderClose +
+    trackingFolder +
+    `
+  </Document>
+</kml>`
+  );
 
-    console.log("🔍 Export Environment:", env);
-
-    const blob = new Blob([content], { type: mimeType });
-    console.log(`📄 Blob created: ${blob.size} bytes, type: ${blob.type}`);
-
-    // METHOD 1: Try iOS Share Sheet (Most reliable on iPad)
-    if (env.canShare && env.canShareFiles) {
-      try {
-        const file = new File([blob], filename, { type: mimeType });
-        console.log(`📤 Attempting share sheet: ${file.name}`);
-
-        await navigator.share({
-          files: [file],
-          title: title,
-          text: `Rally route export: ${filename}`,
-        });
-
-        console.log("✅ Share sheet successful");
-        return { success: true, method: "share_sheet" };
-      } catch (shareErr) {
-        console.log("⚠️ Share sheet failed:", shareErr.message);
-      }
-    }
-
-    // METHOD 2: Direct download (works in some iPad browsers)
-    if (env.downloadSupport && env.urlSupport) {
-      try {
-        console.log("📥 Attempting direct download");
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.style.display = "none";
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }, 1000);
-        console.log("✅ Direct download triggered");
-        return { success: true, method: "direct_download" };
-      } catch (downloadErr) {
-        console.log("⚠️ Direct download failed:", downloadErr.message);
-      }
-    }
-
-    // METHOD 3: Open in new window (iPad fallback)
+  const exportFileIPadCompatible = async (
+    content,
+    filename,
+    mimeType,
+    title = "Rally Mapper Export"
+  ) => {
     try {
-      console.log("🔗 Attempting new window method");
-      const url = URL.createObjectURL(blob);
-      const newWindow = window.open(url, "_blank");
-      if (newWindow) {
-        setTimeout(() => URL.revokeObjectURL(url), 5000);
-        console.log("✅ New window opened");
-        return { success: true, method: "new_window" };
-      } else {
-        throw new Error("Popup blocked");
-      }
-    } catch (windowErr) {
-      console.log("⚠️ New window failed:", windowErr.message);
-    }
+      console.log(`🔍 === STARTING EXPORT: ${filename} ===`);
+      console.log(`📄 Content length: ${content.length} characters`);
+      console.log(`📄 MIME type: ${mimeType}`);
+      console.log(`📄 File size: ${new Blob([content]).size} bytes`);
 
-    // METHOD 4: Data URL (last resort)
-    try {
-      console.log("📋 Attempting data URL method");
-      const reader = new FileReader();
-      return new Promise((resolve) => {
-        reader.onload = () => {
-          const dataUrl = reader.result;
+      const env = {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        isIPad: /iPad|iPhone|iPod/.test(navigator.userAgent),
+        isPWA: window.navigator.standalone,
+        isIOSSafari:
+          /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
+        canShare: !!navigator.canShare,
+        canShareFiles: navigator.canShare
+          ? navigator.canShare({ files: [new File([""], "test.txt")] })
+          : false,
+        downloadSupport: "download" in document.createElement("a"),
+        blobSupport: !!window.Blob,
+        urlSupport: !!window.URL,
+      };
+
+      console.log("🔍 Export Environment:", env);
+
+      const blob = new Blob([content], { type: mimeType });
+      console.log(`📄 Blob created: ${blob.size} bytes, type: ${blob.type}`);
+
+      // METHOD 1: Try iOS Share Sheet (Most reliable on iPad)
+      if (env.canShare && env.canShareFiles) {
+        try {
+          const file = new File([blob], filename, { type: mimeType });
+          console.log(`📤 Attempting share sheet: ${file.name}`);
+
+          await navigator.share({
+            files: [file],
+            title: title,
+            text: `Rally route export: ${filename}`,
+          });
+
+          console.log("✅ Share sheet successful");
+          return { success: true, method: "share_sheet" };
+        } catch (shareErr) {
+          console.log("⚠️ Share sheet failed:", shareErr.message);
+        }
+      }
+
+      // METHOD 2: Direct download (works in some iPad browsers)
+      if (env.downloadSupport && env.urlSupport) {
+        try {
+          console.log("📥 Attempting direct download");
+          const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
-          a.href = dataUrl;
+          a.href = url;
           a.download = filename;
+          a.style.display = "none";
+          document.body.appendChild(a);
           a.click();
-          console.log("✅ Data URL method triggered");
-          resolve({ success: true, method: "data_url" });
-        };
-        reader.readAsDataURL(blob);
-      });
-    } catch (dataErr) {
-      console.log("⚠️ Data URL failed:", dataErr.message);
+          setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }, 1000);
+          console.log("✅ Direct download triggered");
+          return { success: true, method: "direct_download" };
+        } catch (downloadErr) {
+          console.log("⚠️ Direct download failed:", downloadErr.message);
+        }
+      }
+
+      // METHOD 3: Open in new window (iPad fallback)
+      try {
+        console.log("🔗 Attempting new window method");
+        const url = URL.createObjectURL(blob);
+        const newWindow = window.open(url, "_blank");
+        if (newWindow) {
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+          console.log("✅ New window opened");
+          return { success: true, method: "new_window" };
+        } else {
+          throw new Error("Popup blocked");
+        }
+      } catch (windowErr) {
+        console.log("⚠️ New window failed:", windowErr.message);
+      }
+
+      // METHOD 4: Data URL (last resort)
+      try {
+        console.log("📋 Attempting data URL method");
+        const reader = new FileReader();
+        return new Promise((resolve) => {
+          reader.onload = () => {
+            const dataUrl = reader.result;
+            const a = document.createElement("a");
+            a.href = dataUrl;
+            a.download = filename;
+            a.click();
+            console.log("✅ Data URL method triggered");
+            resolve({ success: true, method: "data_url" });
+          };
+          reader.readAsDataURL(blob);
+        });
+      } catch (dataErr) {
+        console.log("⚠️ Data URL failed:", dataErr.message);
+      }
+
+      throw new Error("All export methods failed");
+    } catch (error) {
+      console.error(`❌ Export failed for ${filename}:`, error);
+      return { success: false, error: error.message };
     }
+  };
 
-    throw new Error("All export methods failed");
-  } catch (error) {
-    console.error(`❌ Export failed for ${filename}:`, error);
-    return { success: false, error: error.message };
-  }
-};
-
-const libraries = []; // declared outside the component or at top level
-
+function Home({ user, isGuestMode }) {
+  const libraries = []; // declared outside the component or at top level
 
   const [syncStatus, setSyncStatus] = useState(
     isGuestMode ? "offline" : "online"
@@ -612,8 +654,8 @@ const libraries = []; // declared outside the component or at top level
   const [stage, setstage] = useState([]);
   const [stageSummaries, setstageSummaries] = useState([]);
   const [stageName, setstageName] = useState("Stage 1");
-  const [trackingPoints, setTrackingPoints] = useState([]);
-  const [waypoints, setWaypoints] = useState([]);
+  //const [trackingPoints, setTrackingPoints] = useState([]);
+  const [routeWaypoints, setWaypoints] = useState([]);
   const [showReplay, setShowReplay] = useState(false);
   const waypointListRef = useRef(null);
   const [recognitionActive, setRecognitionActive] = useState(false);
@@ -653,9 +695,7 @@ const libraries = []; // declared outside the component or at top level
     useState(false);
   const [continuousListening, setContinuousListening] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
-  
 
-  
   const handleSignOut = async () => {
     try {
       if (user !== "guest") {
@@ -689,17 +729,17 @@ const libraries = []; // declared outside the component or at top level
 
   // Auto-save to Supabase
   useEffect(() => {
-    if (user && user !== "guest" && waypoints.length > 0) {
+    if (user && user !== "guest" && routeWaypoints.length > 0) {
       const saveTimer = setTimeout(() => {
         dataSync
-          .autoSave({ waypoints, trackingPoints, routeName })
+          .autoSave({ routeWaypoints, trackingPoints, routeName })
           .then(() => setSyncStatus("synced"))
           .catch(() => setSyncStatus("error"));
       }, 5000);
 
       return () => clearTimeout(saveTimer);
     }
-  }, [waypoints, user, trackingPoints, routeName]);
+  }, [routeWaypoints, user, trackingPoints, routeName]);
 
   useEffect(() => {
     return () => {
@@ -711,7 +751,7 @@ const libraries = []; // declared outside the component or at top level
     };
   }, [currentRecognition]);
 
-  // Load saved waypoints
+  // Load saved routeWaypoints
   useEffect(() => {
     const stored = localStorage.getItem("unsavedWaypoints");
     if (stored) {
@@ -798,20 +838,20 @@ const libraries = []; // declared outside the component or at top level
   }, []);
 
   useEffect(() => {
-    if (waypoints.length > 0) {
-      localStorage.setItem("unsavedWaypoints", JSON.stringify(waypoints));
+    if (routeWaypoints.length > 0) {
+      localStorage.setItem("unsavedWaypoints", JSON.stringify(routeWaypoints));
     }
-  }, [waypoints]);
+  }, [routeWaypoints]);
 
   useEffect(() => {
-    console.log("Waypoints changed:", waypoints);
-  }, [waypoints]);
+    console.log("Waypoints changed:", routeWaypoints);
+  }, [routeWaypoints]);
 
   useEffect(() => {
     if (waypointListRef.current) {
       waypointListRef.current.scrollTop = waypointListRef.current.scrollHeight;
     }
-  }, [waypoints]);
+  }, [routeWaypoints]);
 
   useEffect(() => {
     if (!isTracking) return;
@@ -871,11 +911,11 @@ const libraries = []; // declared outside the component or at top level
   }, [showUndo]);
 
   const handleNewDay = () => {
-    if (waypoints.length > 0 || routeName.trim() !== "") {
+    if (routeWaypoints.length > 0 || routeName.trim() !== "") {
       const confirmNewDay = window.confirm(
         `Start Day ${
           currentDay + 1
-        }? This will clear all current day data (routes, stages, waypoints). Make sure you've exported your current data first.`
+        }? This will clear all current day data (routes, stages, routeWaypoints). Make sure you've exported your current data first.`
       );
 
       if (!confirmNewDay) return;
@@ -899,9 +939,9 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const handleNewRoute = () => {
-    if (waypoints.length > 0 || routeName.trim() !== "") {
+    if (routeWaypoints.length > 0 || routeName.trim() !== "") {
       const confirmNewRoute = window.confirm(
-        `Start new route? This will clear current route data (stages, waypoints). Make sure you've exported your current route first.`
+        `Start new route? This will clear current route data (stages, routeWaypoints). Make sure you've exported your current route first.`
       );
 
       if (!confirmNewRoute) return;
@@ -932,7 +972,7 @@ const libraries = []; // declared outside the component or at top level
     const fullTimestamp = now.toISOString();
 
     const cumulativeDistance = startGPS
-      ? calculateCumulativeDistance(waypoints, currentGPS.lat, currentGPS.lon)
+      ? calculateCumulativeDistance(routeWaypoints, currentGPS.lat, currentGPS.lon)
       : 0;
 
     const waypoint = {
@@ -988,7 +1028,7 @@ const libraries = []; // declared outside the component or at top level
         console.log("- todayDate:", todayDate);
         console.log("- stageCount:", stageCount);
         console.log("- stageName:", stageName);
-        setstage((prev) => [...prev, { name: stageName, waypoints: [] }]);
+        setstage((prev) => [...prev, { name: stageName, routeWaypoints: [] }]);
         setstageName(stageName);
         setstageCount((prev) => prev + 1);
         setstageLoading(false);
@@ -1013,8 +1053,8 @@ const libraries = []; // declared outside the component or at top level
       return { lat: currentGPS.lat, lng: currentGPS.lon };
     }
 
-    if (waypoints.length > 0) {
-      return { lat: waypoints[0].lat, lng: waypoints[0].lon };
+    if (routeWaypoints.length > 0) {
+      return { lat: routeWaypoints[0].lat, lng: routeWaypoints[0].lon };
     }
 
     if (currentGPS) {
@@ -1183,7 +1223,7 @@ const libraries = []; // declared outside the component or at top level
       cleanText.includes("stage start") ||
       cleanText.includes("start stage")
     ) {
-      if (waypoints.length > 0) {
+      if (routeWaypoints.length > 0) {
         setShowStartstageConfirm(true);
       } else {
         handleStartstage();
@@ -1204,7 +1244,7 @@ const libraries = []; // declared outside the component or at top level
     if (stageStarted) {
       processVoiceCommand(transcript);
     } else {
-      setGpsError("Start a stage first to add waypoints.");
+      setGpsError("Start a stage first to add routeWaypoints.");
       setTimeout(() => setGpsError(null), 1000);
     }
   };
@@ -1679,7 +1719,7 @@ const libraries = []; // declared outside the component or at top level
     const fullTimestamp = now.toISOString();
 
     const cumulativeDistance = startGPS
-      ? calculateCumulativeDistance(waypoints, currentGPS.lat, currentGPS.lon)
+      ? calculateCumulativeDistance(routeWaypoints, currentGPS.lat, currentGPS.lon)
       : 0;
 
     const waypoint = {
@@ -1711,8 +1751,8 @@ const libraries = []; // declared outside the component or at top level
   const startEditingWaypoint = (index) => {
     setEditingWaypoint(index);
     setEditValues({
-      name: waypoints[index].name,
-      poi: waypoints[index].poi || "",
+      name: routeWaypoints[index].name,
+      poi: routeWaypoints[index].poi || "",
     });
   };
 
@@ -1768,10 +1808,10 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const selectAllWaypoints = () => {
-    if (selectedWaypoints.size === waypoints.length) {
+    if (selectedWaypoints.size === routeWaypoints.length) {
       setSelectedWaypoints(new Set());
     } else {
-      setSelectedWaypoints(new Set(waypoints.map((_, index) => index)));
+      setSelectedWaypoints(new Set(routeWaypoints.map((_, index) => index)));
     }
   };
 
@@ -1801,11 +1841,11 @@ const libraries = []; // declared outside the component or at top level
 
     if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
 
-    console.log(`🗑️ Deleted ${selectedWaypoints.size} waypoints`);
+    console.log(`🗑️ Deleted ${selectedWaypoints.size} routeWaypoints`);
   };
 
   const handleUndoLastWaypoint = () => {
-    if (waypoints.length === 0) return;
+    if (routeWaypoints.length === 0) return;
 
     setWaypoints((prev) => prev.slice(0, -1));
 
@@ -1818,7 +1858,7 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const exportAsJSON = async (
-    waypointsData = waypoints,
+    waypointsData = routeWaypoints,
     trackingData = trackingPoints,
     name = "stage"
   ) => {
@@ -1851,7 +1891,7 @@ const libraries = []; // declared outside the component or at top level
           hasTracking: trackingData.length > 0,
           trackingPoints: trackingData.length,
         },
-        waypoints: waypointsData.map((wp, index) => ({
+        routeWaypoints: waypointsData.map((wp, index) => ({
           id: index + 1,
           name: wp.name,
           coordinates: { lat: wp.lat, lon: wp.lon, accuracy: gpsAccuracy },
@@ -1907,7 +1947,7 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const exportAsSimpleJSON = async (
-    waypointsData = waypoints,
+    waypointsData = routeWaypoints,
     trackingData = trackingPoints,
     name = "stage"
   ) => {
@@ -1918,7 +1958,7 @@ const libraries = []; // declared outside the component or at top level
         name: routeName || name,
         stageName: stageName,
         date: new Date().toISOString(),
-        waypoints: waypointsData.map((wp, index) => ({
+        routeWaypoints: waypointsData.map((wp, index) => ({
           name: wp.name,
           lat: wp.lat,
           lon: wp.lon,
@@ -1956,7 +1996,7 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const exportAsGPX = async (
-    waypointsData = waypoints,
+    waypointsData = routeWaypoints,
     trackingData = trackingPoints,
     name = "route"
   ) => {
@@ -1982,7 +2022,7 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const exportAsRallyNavigatorGPX = async (
-    waypointsData = waypoints,
+    waypointsData = routeWaypoints,
     trackingData = trackingPoints,
     name = "route"
   ) => {
@@ -1997,7 +2037,7 @@ const libraries = []; // declared outside the component or at top level
       <n>${name}</n>
       <desc>Rally route with voice instructions - ${
         waypointsData.length
-      } waypoints</desc>
+      } routeWaypoints</desc>
       <time>${new Date().toISOString()}</time>
     </metadata>
     
@@ -2069,7 +2109,7 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const exportAsKML = async (
-    waypointsData = waypoints,
+    waypointsData = routeWaypoints,
     trackingData = trackingPoints,
     name = "route"
   ) => {
@@ -2099,23 +2139,23 @@ const libraries = []; // declared outside the component or at top level
       setIsFollowingGPS(true);
 
       const stageNameFormatted = `${todayDate}/Stage ${stageCount}`;
-      const currentstage = { name: stageNameFormatted, waypoints };
+      const currentstage = { name: stageNameFormatted, routeWaypoints };
 
       const summary = {
         name: stageNameFormatted,
-        waypointCount: waypoints.length,
-        startTime: waypoints[0]?.timestamp || "N/A",
-        endTime: waypoints[waypoints.length - 1]?.timestamp || "N/A",
-        totalDistance: waypoints
+        waypointCount: routeWaypoints.length,
+        startTime: routeWaypoints[0]?.timestamp || "N/A",
+        endTime: routeWaypoints[routeWaypoints.length - 1]?.timestamp || "N/A",
+        totalDistance: routeWaypoints
           .reduce((sum, wp) => sum + parseFloat(wp.distance || 0), 0)
           .toFixed(2),
-        pois: [...new Set(waypoints.map((wp) => wp.poi).filter(Boolean))],
-        startCoords: waypoints[0]
-          ? `${waypoints[0].lat.toFixed(5)}, ${waypoints[0].lon.toFixed(5)}`
+        pois: [...new Set(routeWaypoints.map((wp) => wp.poi).filter(Boolean))],
+        startCoords: routeWaypoints[0]
+          ? `${routeWaypoints[0].lat.toFixed(5)}, ${routeWaypoints[0].lon.toFixed(5)}`
           : "N/A",
-        endCoords: waypoints[waypoints.length - 1]
-          ? `${waypoints[waypoints.length - 1].lat.toFixed(5)}, ${waypoints[
-              waypoints.length - 1
+        endCoords: routeWaypoints[routeWaypoints.length - 1]
+          ? `${routeWaypoints[routeWaypoints.length - 1].lat.toFixed(5)}, ${routeWaypoints[
+              routeWaypoints.length - 1
             ].lon.toFixed(5)}`
           : "N/A",
         routeName: routeName || "Unnamed Route",
@@ -2130,7 +2170,7 @@ const libraries = []; // declared outside the component or at top level
 
       console.log("🔍 === MAIN EXPORT PROCESS START ===");
       console.log("Export name:", exportName);
-      console.log("Waypoints:", waypoints.length);
+      console.log("Waypoints:", routeWaypoints.length);
       console.log("Tracking points:", trackingPoints.length);
 
       // SUPABASE INTEGRATION (if user is logged in)
@@ -2155,8 +2195,8 @@ const libraries = []; // declared outside the component or at top level
               stageName: stageNameFormatted,
               stageNumber: stageCount,
               startGPS: startGPS,
-              startTime: waypoints[0]?.fullTimestamp,
-              waypoints: waypoints,
+              startTime: routeWaypoints[0]?.fullTimestamp,
+              routeWaypoints: routeWaypoints,
             },
             routeId
           );
@@ -2179,23 +2219,23 @@ const libraries = []; // declared outside the component or at top level
       try {
         console.log("📤 Starting sequential exports...");
 
-        const json1 = await exportAsJSON(waypoints, trackingPoints, exportName);
+        const json1 = await exportAsJSON(routeWaypoints, trackingPoints, exportName);
         exportResults.push(json1);
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         const json2 = await exportAsSimpleJSON(
-          waypoints,
+          routeWaypoints,
           trackingPoints,
           exportName
         );
         exportResults.push(json2);
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        const gpx = await exportAsGPX(waypoints, trackingPoints, exportName);
+        const gpx = await exportAsGPX(routeWaypoints, trackingPoints, exportName);
         exportResults.push(gpx);
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        const kml = await exportAsKML(waypoints, trackingPoints, exportName);
+        const kml = await exportAsKML(routeWaypoints, trackingPoints, exportName);
         exportResults.push(kml);
 
         console.log("📤 All sequential exports completed");
@@ -2236,7 +2276,7 @@ const libraries = []; // declared outside the component or at top level
       setIsTracking(false);
       localStorage.removeItem("unsavedWaypoints");
 
-      if (waypoints.length === 0) {
+      if (routeWaypoints.length === 0) {
         localStorage.removeItem("current_route_id");
       }
 
@@ -2273,15 +2313,15 @@ const libraries = []; // declared outside the component or at top level
     );
   }
 
-  const routePath = waypoints.map((wp) => ({
+  const routePath = routeWaypoints.map((wp) => ({
     lat: wp.lat,
     lng: wp.lon,
   }));
 
   const routeDistance =
-    waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0;
+    routeWaypoints.length > 0 ? routeWaypoints[routeWaypoints.length - 1].distance : 0;
   const routeStats = {
-    totalWaypoints: waypoints.length,
+    totalWaypoints: routeWaypoints.length,
     routeDistance: routeDistance,
     avgSpeed:
       isTracking && trackingPoints.length > 1
@@ -2430,8 +2470,8 @@ const libraries = []; // declared outside the component or at top level
               lineHeight: "1.5",
             }}
           >
-            This will clear your current {waypoints.length} waypoint
-            {waypoints.length !== 1 ? "s" : ""} and start fresh. Make sure
+            This will clear your current {routeWaypoints.length} waypoint
+            {routeWaypoints.length !== 1 ? "s" : ""} and start fresh. Make sure
             you've exported your current data first.
           </p>
           <div style={{ display: "flex", gap: "12px" }}>
@@ -2520,7 +2560,7 @@ const libraries = []; // declared outside the component or at top level
               lineHeight: "1.5",
             }}
           >
-            This will export your route data and clear current waypoints. This
+            This will export your route data and clear current routeWaypoints. This
             action cannot be undone.
           </p>
           <div style={{ display: "flex", gap: "12px" }}>
@@ -2606,7 +2646,7 @@ const libraries = []; // declared outside the component or at top level
   );
 
   const RouteStatsOverlay = () => {
-    if (!showRouteStats || waypoints.length === 0) {
+    if (!showRouteStats || routeWaypoints.length === 0) {
       return null;
     }
 
@@ -2725,7 +2765,7 @@ const libraries = []; // declared outside the component or at top level
           {showReplay ? "Hide" : "Show"} Route Replay
         </button>
 
-        {showReplay && <ReplayRoute waypoints={waypoints} />}
+        {showReplay && <ReplayRoute routeWaypoints={routeWaypoints} />}
 
         <button
           onClick={recenterOnGPS}
@@ -2803,7 +2843,7 @@ const libraries = []; // declared outside the component or at top level
                   />
                 )}
 
-                {waypoints.map((wp, index) => {
+                {routeWaypoints.map((wp, index) => {
                   if (!wp.lat || !wp.lon) {
                     console.warn(
                       `⚠️ Skipping invalid waypoint at index ${index}`,
@@ -2856,38 +2896,38 @@ const libraries = []; // declared outside the component or at top level
                   />
                 )}
 
-                {selectedWaypoint !== null && waypoints[selectedWaypoint] && (
+                {selectedWaypoint !== null && routeWaypoints[selectedWaypoint] && (
                   <InfoWindow
                     position={{
-                      lat: waypoints[selectedWaypoint].lat,
-                      lng: waypoints[selectedWaypoint].lon,
+                      lat: routeWaypoints[selectedWaypoint].lat,
+                      lng: routeWaypoints[selectedWaypoint].lon,
                     }}
                     onCloseClick={() => setSelectedWaypoint(null)}
                   >
                     <div className="p-2 max-w-xs">
                       <div className="flex items-center mb-2">
                         <strong className="text-lg">
-                          {waypoints[selectedWaypoint].name}
+                          {routeWaypoints[selectedWaypoint].name}
                         </strong>
                       </div>
                       <div className="space-y-1 text-sm">
                         <div>
                           <strong>Time:</strong>{" "}
-                          {waypoints[selectedWaypoint].timestamp}
+                          {routeWaypoints[selectedWaypoint].timestamp}
                         </div>
                         <div>
                           <strong>Position:</strong>{" "}
-                          {waypoints[selectedWaypoint].lat.toFixed(6)},{" "}
-                          {waypoints[selectedWaypoint].lon.toFixed(6)}
+                          {routeWaypoints[selectedWaypoint].lat.toFixed(6)},{" "}
+                          {routeWaypoints[selectedWaypoint].lon.toFixed(6)}
                         </div>
                         <div>
                           <strong>Distance from start:</strong>{" "}
-                          {waypoints[selectedWaypoint].distance} km
+                          {routeWaypoints[selectedWaypoint].distance} km
                         </div>
-                        {waypoints[selectedWaypoint].poi && (
+                        {routeWaypoints[selectedWaypoint].poi && (
                           <div>
                             <strong>Notes:</strong>{" "}
-                            {waypoints[selectedWaypoint].poi}
+                            {routeWaypoints[selectedWaypoint].poi}
                           </div>
                         )}
                       </div>
@@ -2955,7 +2995,7 @@ const libraries = []; // declared outside the component or at top level
               <button
                 className="bg-green-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
                 onClick={() => {
-                  if (waypoints.length > 0) {
+                  if (routeWaypoints.length > 0) {
                     setShowStartstageConfirm(true);
                   } else {
                     handleStartstage();
@@ -2976,7 +3016,7 @@ const libraries = []; // declared outside the component or at top level
               <button
                 className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-red-600 disabled:cursor-not-allowed text-sm"
                 onClick={() => setShowEndstageConfirm(true)}
-                disabled={waypoints.length === 0}
+                disabled={routeWaypoints.length === 0}
               >
                 ⏹ End Stage
               </button>
@@ -3145,7 +3185,7 @@ const libraries = []; // declared outside the component or at top level
                 🧭 Current Stage Waypoints
               </h2>
 
-              {waypoints.length > 0 && (
+              {routeWaypoints.length > 0 && (
                 <div
                   style={{ display: "flex", alignItems: "center", gap: "8px" }}
                 >
@@ -3158,7 +3198,7 @@ const libraries = []; // declared outside the component or at top level
                         onClick={selectAllWaypoints}
                         className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
                       >
-                        {selectedWaypoints.size === waypoints.length
+                        {selectedWaypoints.size === routeWaypoints.length
                           ? "Deselect All"
                           : "Select All"}
                       </button>
@@ -3194,8 +3234,8 @@ const libraries = []; // declared outside the component or at top level
                 paddingRight: "4px",
               }}
             >
-              {waypoints.length === 0 ? (
-                <p className="text-gray-500">No waypoints added yet.</p>
+              {routeWaypoints.length === 0 ? (
+                <p className="text-gray-500">No routeWaypoints added yet.</p>
               ) : (
                 <div
                   style={{
@@ -3204,7 +3244,7 @@ const libraries = []; // declared outside the component or at top level
                     gap: "8px",
                   }}
                 >
-                  {waypoints.map((wp, idx) => (
+                  {routeWaypoints.map((wp, idx) => (
                     <div key={idx} className="bg-gray-100 p-3 rounded">
                       {bulkSelectMode && (
                         <div
@@ -3410,20 +3450,47 @@ const libraries = []; // declared outside the component or at top level
     </div>
   );
 }
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [isGuestMode, setIsGuestMode] = useState(false);
-  
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route
-          path="/"
-          element={<Home user={user} isGuestMode={isGuestMode} />}
-        />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-      </Routes>
-    </BrowserRouter>
-  );
+
 }
+
+function App() {
+  const [user, setUser] = React.useState(null);
+  const [authLoading, setAuthLoading] = React.useState(true);
+  const [guest, setGuest] = React.useState(false);
+
+  React.useEffect(() => {
+    let sub;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+      const ch = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+        setAuthLoading(false);
+      });
+      sub = ch?.data?.subscription;
+    })();
+    return () => {
+      try { sub?.unsubscribe?.(); } catch {}
+    };
+  }, []);
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Checking session…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user && !guest) {
+    return <Auth onGuest={() => setGuest(true)} />;
+  }
+
+  return <Home user={user} isGuestMode={!user && guest} />;
+}
+
+export default App;

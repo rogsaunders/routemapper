@@ -56,548 +56,8 @@ function calculateCumulativeDistance(waypoints, currentLat, currentLon) {
   return parseFloat(totalDistance.toFixed(2));
 }
 
-const UserProfile = ({ user, onClose, onAccountDeleted }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState({
-    displayName: user?.user_metadata?.full_name || "",
-    email: user?.email || "",
-  });
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  const handleUpdateProfile = async () => {
-    setLoading(true);
-    setMessage("");
-    try {
-      const { error } = await supabase.auth.updateUser({
-        data: { full_name: profile.displayName },
-      });
-      if (error) throw error;
-      setMessage("Profile updated successfully!");
-      setIsEditing(false);
-    } catch (error) {
-      setMessage(`Error: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChangePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      setMessage("Passwords do not match");
-      return;
-    }
-    if (newPassword.length < 6) {
-      setMessage("Password must be at least 6 characters");
-      return;
-    }
-    setLoading(true);
-    setMessage("");
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (error) throw error;
-      setMessage("Password changed successfully!");
-      setNewPassword("");
-      setConfirmPassword("");
-    } catch (error) {
-      setMessage(`Error: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">User Profile</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            ✕
-          </button>
-        </div>
-
-        {message && (
-          <div
-            className={`p-3 rounded mb-4 ${
-              message.includes("Error")
-                ? "bg-red-100 text-red-700"
-                : "bg-green-100 text-green-700"
-            }`}
-          >
-            {message}
-          </div>
-        )}
-
-        {/* Profile Section */}
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3">Profile Information</h3>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Display Name
-              </label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={profile.displayName}
-                  onChange={(e) =>
-                    setProfile((prev) => ({
-                      ...prev,
-                      displayName: e.target.value,
-                    }))
-                  }
-                  className="w-full p-2 border rounded"
-                />
-              ) : (
-                <p className="p-2 bg-gray-50 rounded">
-                  {profile.displayName || "Not set"}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
-              <p className="p-2 bg-gray-50 rounded">{profile.email}</p>
-            </div>
-            <div className="flex gap-2">
-              {isEditing ? (
-                <>
-                  <button
-                    onClick={handleUpdateProfile}
-                    disabled={loading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {loading ? "Updating..." : "Save Changes"}
-                  </button>
-                  <button
-                    onClick={() => setIsEditing(false)}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                  >
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-                >
-                  Edit Profile
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Password Change Section */}
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3">Change Password</h3>
-          <div className="space-y-3">
-            <input
-              type="password"
-              placeholder="New Password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-            <input
-              type="password"
-              placeholder="Confirm New Password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full p-2 border rounded"
-            />
-            <button
-              onClick={handleChangePassword}
-              disabled={loading || !newPassword || !confirmPassword}
-              className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-            >
-              {loading ? "Changing..." : "Change Password"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-function mapCategoryToStandardIcon(category, description) {
-  const text = description.toLowerCase();
-
-  // Map categories and keywords to standard rally icons
-  const iconMapping = {
-    safety: {
-      icon: "danger",
-      gpxType: "danger",
-      priority:
-        text.includes("severe") || text.includes("extreme") ? "high" : "medium",
-    },
-    navigation: {
-      icon: text.includes("left")
-        ? "left"
-        : text.includes("right")
-        ? "right"
-        : text.includes("straight")
-        ? "straight"
-        : "navigation",
-      gpxType: "turn",
-      priority: "high",
-    },
-    surface: {
-      icon: text.includes("bump")
-        ? "bump"
-        : text.includes("hole")
-        ? "hole"
-        : text.includes("rough")
-        ? "bumpy"
-        : "surface",
-      gpxType: "hazard",
-      priority: "medium",
-    },
-    obstacle: {
-      icon:
-        text.includes("grid") || text.includes("cattle")
-          ? "grid"
-          : text.includes("gate")
-          ? "fence-gate"
-          : "obstacle",
-      gpxType: "waypoint",
-      priority: "medium",
-    },
-    elevation: {
-      icon:
-        text.includes("summit") || text.includes("peak")
-          ? "summit"
-          : text.includes("hill")
-          ? "uphill"
-          : "elevation",
-      gpxType: "summit",
-      priority: "low",
-    },
-    crossing: {
-      icon: text.includes("bridge")
-        ? "bridge"
-        : text.includes("water") || text.includes("ford")
-        ? "wading"
-        : "crossing",
-      gpxType: "water",
-      priority: "high",
-    },
-    landmark: {
-      icon: "landmark",
-      gpxType: "building",
-      priority: "low",
-    },
-    timing: {
-      icon: "control",
-      gpxType: "checkpoint",
-      priority: "high",
-    },
-  };
-
-  return (
-    iconMapping[category] || {
-      icon: "waypoint",
-      gpxType: "waypoint",
-      priority: "medium",
-    }
-  );
-}
-
-function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
-  const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="RallyMapper-Voice-v2.0" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
-  <metadata>
-    <name>${name}</name>
-    <desc>Rally route created with RallyMapper Voice Navigation - ${
-      waypoints.length
-    } waypoints</desc>
-    <author>
-      <name>RallyMapper Voice</name>
-    </author>
-    <time>${new Date().toISOString()}</time>
-    <keywords>rally,navigation,voice,waypoints,instructions</keywords>
-  </metadata>`;
-
-  // Enhanced waypoints with Rally Navigator specific formatting
-  const waypointEntries = waypoints
-    .map((wp, index) => {
-      const iconInfo = mapCategoryToStandardIcon(
-        wp.category || "general",
-        wp.name
-      );
-      const isVoiceCreated = wp.voiceCreated ? " (Voice)" : "";
-
-      // Create instruction-friendly name
-      const instructionName = wp.name;
-      const waypointNumber = (index + 1).toString().padStart(3, "0");
-
-      // Fix the timestamp issue - create a proper date
-      const waypointTime = wp.fullTimestamp
-        ? new Date(wp.fullTimestamp).toISOString()
-        : new Date().toISOString();
-
-      return `
-  <wpt lat="${wp.lat}" lon="${wp.lon}">
-    <name>WP${waypointNumber}: ${instructionName}${isVoiceCreated}</name>
-    <desc>${instructionName}</desc>
-    <cmt>${instructionName} - Distance: ${wp.distance}km${
-        wp.speedContext ? " - Speed: " + wp.speedContext : ""
-      }</cmt>
-    <time>${waypointTime}</time>
-    <sym>${iconInfo.icon}</sym>
-    <type>${iconInfo.gpxType}</type>
-    <extensions>
-      <category>${wp.category || "general"}</category>
-      <priority>${iconInfo.priority}</priority>
-      <voice_created>${wp.voiceCreated || false}</voice_created>
-      <rally_icon>${iconInfo.icon}</rally_icon>
-      <instruction>${instructionName}</instruction>
-      <distance_km>${wp.distance}</distance_km>
-      ${
-        wp.speedContext
-          ? `<speed_context>${wp.speedContext}</speed_context>`
-          : ""
-      }
-      ${
-        wp.rawTranscript
-          ? `<original_transcript>${wp.rawTranscript}</original_transcript>`
-          : ""
-      }
-      ${
-        wp.processedText
-          ? `<processed_text>${wp.processedText}</processed_text>`
-          : ""
-      }
-    </extensions>
-  </wpt>`;
-    })
-    .join("");
-
-  // Enhanced route stage with Rally Navigator specific route points
-  const routestage =
-    waypoints.length > 1
-      ? `
-  <rte>
-    <name>${name} - Rally Instructions</name>
-    <desc>Rally navigation route with turn-by-turn instructions - ${
-      waypoints.length
-    } waypoints - Total distance: ${
-          waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0
-        }km</desc>
-    <extensions>
-      <total_waypoints>${waypoints.length}</total_waypoints>
-      <voice_waypoints>${
-        waypoints.filter((wp) => wp.voiceCreated).length
-      }</voice_waypoints>
-      <creation_date>${new Date().toISOString()}</creation_date>
-      <rally_instructions>true</rally_instructions>
-    </extensions>
-    ${waypoints
-      .map((wp, index) => {
-        const iconInfo = mapCategoryToStandardIcon(
-          wp.category || "general",
-          wp.name
-        );
-        const waypointNumber = (index + 1).toString().padStart(3, "0");
-
-        return `
-    <rtept lat="${wp.lat}" lon="${wp.lon}">
-      <name>WP${waypointNumber}: ${wp.name}</name>
-      <desc>${wp.name}</desc>
-      <cmt>${wp.name} - ${wp.distance}km</cmt>
-      <sym>${iconInfo.icon}</sym>
-      <type>${iconInfo.gpxType}</type>
-      <extensions>
-        <rally_instruction>${wp.name}</rally_instruction>
-        <instruction_text>${wp.name}</instruction_text>
-        <distance_from_start>${wp.distance}</distance_from_start>
-        <waypoint_category>${wp.category || "general"}</waypoint_category>
-        <waypoint_number>${index + 1}</waypoint_number>
-        <voice_created>${wp.voiceCreated || false}</voice_created>
-      </extensions>
-    </rtept>`;
-      })
-      .join("")}
-  </rte>`
-      : "";
-
-  // Enhanced tracking with metadata
-  const trackingSegment =
-    trackingPoints.length > 0
-      ? `
-  <trk>
-    <name>${name} - GPS Track</name>
-    <desc>Auto-recorded GPS breadcrumbs - ${trackingPoints.length} points</desc>
-    <extensions>
-      <track_points>${trackingPoints.length}</track_points>
-      <recording_interval>20_seconds</recording_interval>
-    </extensions>
-    <trkseg>
-      ${trackingPoints
-        .map(
-          (pt) => `
-      <trkpt lat="${pt.lat}" lon="${pt.lon}">
-        <time>${pt.timestamp || new Date().toISOString()}</time>
-      </trkpt>`
-        )
-        .join("")}
-    </trkseg>
-  </trk>`
-      : "";
-
-  const gpxFooter = `
-</gpx>`;
-
-  return gpxHeader + waypointEntries + routestage + trackingSegment + gpxFooter;
-}
-
-function buildKML(routeWaypoints = [], trackingPoints = [], name = "Route") {
-  const kmlHeader = `<?xml version="1.0" encoding="UTF-8"?>
-  <kml xmlns="http://www.opengis.net/kml/2.2">`;
-
-  const placemarks = routeWaypoints
-    .map(
-      (wp, i) => `
-        <Placemark>
-          <name>${wp.name || "WP " + (i + 1)}</name>
-          <description>${wp.description || ""}</description>
-          <Point>
-            <coordinates>${wp.lon},${wp.lat},0</coordinates>
-          </Point>
-        </Placemark>`
-    )
-    .join("");
-
-  const kmlFooter = `</kml>`;
-  return `${kmlHeader}<Document><name>${name}</name>${placemarks}</Document>${kmlFooter}`;
-}
-
-const exportFileIPadCompatible = async (
-  content,
-  filename,
-  mimeType,
-  title = "Rally Mapper Export"
-) => {
-  try {
-    console.log(`🔍 === STARTING EXPORT: ${filename} ===`);
-    console.log(`📄 Content length: ${content.length} characters`);
-    console.log(`📄 MIME type: ${mimeType}`);
-    console.log(`📄 File size: ${new Blob([content]).size} bytes`);
-
-    const env = {
-      userAgent: navigator.userAgent,
-      platform: navigator.platform,
-      isIPad: /iPad|iPhone|iPod/.test(navigator.userAgent),
-      isPWA: window.navigator.standalone,
-      isIOSSafari:
-        /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
-      canShare: !!navigator.canShare,
-      canShareFiles: navigator.canShare
-        ? navigator.canShare({ files: [new File([""], "test.txt")] })
-        : false,
-      downloadSupport: "download" in document.createElement("a"),
-      blobSupport: !!window.Blob,
-      urlSupport: !!window.URL,
-    };
-
-    console.log("🔍 Export Environment:", env);
-
-    const blob = new Blob([content], { type: mimeType });
-    console.log(`📄 Blob created: ${blob.size} bytes, type: ${blob.type}`);
-
-    // METHOD 1: Try iOS Share Sheet (Most reliable on iPad)
-    if (env.canShare && env.canShareFiles) {
-      try {
-        const file = new File([blob], filename, { type: mimeType });
-        console.log(`📤 Attempting share sheet: ${file.name}`);
-
-        await navigator.share({
-          files: [file],
-          title: title,
-          text: `Rally route export: ${filename}`,
-        });
-
-        console.log("✅ Share sheet successful");
-        return { success: true, method: "share_sheet" };
-      } catch (shareErr) {
-        console.log("⚠️ Share sheet failed:", shareErr.message);
-      }
-    }
-
-    // METHOD 2: Direct download (works in some iPad browsers)
-    if (env.downloadSupport && env.urlSupport) {
-      try {
-        console.log("📥 Attempting direct download");
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.style.display = "none";
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }, 1000);
-        console.log("✅ Direct download triggered");
-        return { success: true, method: "direct_download" };
-      } catch (downloadErr) {
-        console.log("⚠️ Direct download failed:", downloadErr.message);
-      }
-    }
-
-    // METHOD 3: Open in new window (iPad fallback)
-    try {
-      console.log("🔗 Attempting new window method");
-      const url = URL.createObjectURL(blob);
-      const newWindow = window.open(url, "_blank");
-      if (newWindow) {
-        setTimeout(() => URL.revokeObjectURL(url), 5000);
-        console.log("✅ New window opened");
-        return { success: true, method: "new_window" };
-      } else {
-        throw new Error("Popup blocked");
-      }
-    } catch (windowErr) {
-      console.log("⚠️ New window failed:", windowErr.message);
-    }
-
-    // METHOD 4: Data URL (last resort)
-    try {
-      console.log("📋 Attempting data URL method");
-      const reader = new FileReader();
-      return new Promise((resolve) => {
-        reader.onload = () => {
-          const dataUrl = reader.result;
-          const a = document.createElement("a");
-          a.href = dataUrl;
-          a.download = filename;
-          a.click();
-          console.log("✅ Data URL method triggered");
-          resolve({ success: true, method: "data_url" });
-        };
-        reader.readAsDataURL(blob);
-      });
-    } catch (dataErr) {
-      console.log("⚠️ Data URL failed:", dataErr.message);
-    }
-
-    throw new Error("All export methods failed");
-  } catch (error) {
-    console.error(`❌ Export failed for ${filename}:`, error);
-    return { success: false, error: error.message };
-  }
-};
-
-const libraries = []; // declared outside the component or at top level
-
+function Home({ user, isGuestMode }) {
+  const libraries = []; // declared outside the component or at top level
 
   const [syncStatus, setSyncStatus] = useState(
     isGuestMode ? "offline" : "online"
@@ -613,7 +73,7 @@ const libraries = []; // declared outside the component or at top level
   const [stageSummaries, setstageSummaries] = useState([]);
   const [stageName, setstageName] = useState("Stage 1");
   const [trackingPoints, setTrackingPoints] = useState([]);
-  const [waypoints, setWaypoints] = useState([]);
+  const [routeWaypoints, setWaypoints] = useState([]);
   const [showReplay, setShowReplay] = useState(false);
   const waypointListRef = useRef(null);
   const [recognitionActive, setRecognitionActive] = useState(false);
@@ -653,9 +113,7 @@ const libraries = []; // declared outside the component or at top level
     useState(false);
   const [continuousListening, setContinuousListening] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
-  
 
-  
   const handleSignOut = async () => {
     try {
       if (user !== "guest") {
@@ -689,17 +147,17 @@ const libraries = []; // declared outside the component or at top level
 
   // Auto-save to Supabase
   useEffect(() => {
-    if (user && user !== "guest" && waypoints.length > 0) {
+    if (user && user !== "guest" && routeWaypoints.length > 0) {
       const saveTimer = setTimeout(() => {
         dataSync
-          .autoSave({ waypoints, trackingPoints, routeName })
+          .autoSave({ routeWaypoints, trackingPoints, routeName })
           .then(() => setSyncStatus("synced"))
           .catch(() => setSyncStatus("error"));
       }, 5000);
 
       return () => clearTimeout(saveTimer);
     }
-  }, [waypoints, user, trackingPoints, routeName]);
+  }, [routeWaypoints, user, trackingPoints, routeName]);
 
   useEffect(() => {
     return () => {
@@ -711,7 +169,7 @@ const libraries = []; // declared outside the component or at top level
     };
   }, [currentRecognition]);
 
-  // Load saved waypoints
+  // Load saved routeWaypoints
   useEffect(() => {
     const stored = localStorage.getItem("unsavedWaypoints");
     if (stored) {
@@ -798,20 +256,20 @@ const libraries = []; // declared outside the component or at top level
   }, []);
 
   useEffect(() => {
-    if (waypoints.length > 0) {
-      localStorage.setItem("unsavedWaypoints", JSON.stringify(waypoints));
+    if (routeWaypoints.length > 0) {
+      localStorage.setItem("unsavedWaypoints", JSON.stringify(routeWaypoints));
     }
-  }, [waypoints]);
+  }, [routeWaypoints]);
 
   useEffect(() => {
-    console.log("Waypoints changed:", waypoints);
-  }, [waypoints]);
+    console.log("Waypoints changed:", routeWaypoints);
+  }, [routeWaypoints]);
 
   useEffect(() => {
     if (waypointListRef.current) {
       waypointListRef.current.scrollTop = waypointListRef.current.scrollHeight;
     }
-  }, [waypoints]);
+  }, [routeWaypoints]);
 
   useEffect(() => {
     if (!isTracking) return;
@@ -871,11 +329,11 @@ const libraries = []; // declared outside the component or at top level
   }, [showUndo]);
 
   const handleNewDay = () => {
-    if (waypoints.length > 0 || routeName.trim() !== "") {
+    if (routeWaypoints.length > 0 || routeName.trim() !== "") {
       const confirmNewDay = window.confirm(
         `Start Day ${
           currentDay + 1
-        }? This will clear all current day data (routes, stages, waypoints). Make sure you've exported your current data first.`
+        }? This will clear all current day data (routes, stages, routeWaypoints). Make sure you've exported your current data first.`
       );
 
       if (!confirmNewDay) return;
@@ -899,9 +357,9 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const handleNewRoute = () => {
-    if (waypoints.length > 0 || routeName.trim() !== "") {
+    if (routeWaypoints.length > 0 || routeName.trim() !== "") {
       const confirmNewRoute = window.confirm(
-        `Start new route? This will clear current route data (stages, waypoints). Make sure you've exported your current route first.`
+        `Start new route? This will clear current route data (stages, routeWaypoints). Make sure you've exported your current route first.`
       );
 
       if (!confirmNewRoute) return;
@@ -932,7 +390,11 @@ const libraries = []; // declared outside the component or at top level
     const fullTimestamp = now.toISOString();
 
     const cumulativeDistance = startGPS
-      ? calculateCumulativeDistance(waypoints, currentGPS.lat, currentGPS.lon)
+      ? calculateCumulativeDistance(
+          routeWaypoints,
+          currentGPS.lat,
+          currentGPS.lon
+        )
       : 0;
 
     const waypoint = {
@@ -988,7 +450,7 @@ const libraries = []; // declared outside the component or at top level
         console.log("- todayDate:", todayDate);
         console.log("- stageCount:", stageCount);
         console.log("- stageName:", stageName);
-        setstage((prev) => [...prev, { name: stageName, waypoints: [] }]);
+        setstage((prev) => [...prev, { name: stageName, routeWaypoints: [] }]);
         setstageName(stageName);
         setstageCount((prev) => prev + 1);
         setstageLoading(false);
@@ -1013,8 +475,8 @@ const libraries = []; // declared outside the component or at top level
       return { lat: currentGPS.lat, lng: currentGPS.lon };
     }
 
-    if (waypoints.length > 0) {
-      return { lat: waypoints[0].lat, lng: waypoints[0].lon };
+    if (routeWaypoints.length > 0) {
+      return { lat: routeWaypoints[0].lat, lng: routeWaypoints[0].lon };
     }
 
     if (currentGPS) {
@@ -1183,7 +645,7 @@ const libraries = []; // declared outside the component or at top level
       cleanText.includes("stage start") ||
       cleanText.includes("start stage")
     ) {
-      if (waypoints.length > 0) {
+      if (routeWaypoints.length > 0) {
         setShowStartstageConfirm(true);
       } else {
         handleStartstage();
@@ -1204,7 +666,7 @@ const libraries = []; // declared outside the component or at top level
     if (stageStarted) {
       processVoiceCommand(transcript);
     } else {
-      setGpsError("Start a stage first to add waypoints.");
+      setGpsError("Start a stage first to add routeWaypoints.");
       setTimeout(() => setGpsError(null), 1000);
     }
   };
@@ -1679,7 +1141,11 @@ const libraries = []; // declared outside the component or at top level
     const fullTimestamp = now.toISOString();
 
     const cumulativeDistance = startGPS
-      ? calculateCumulativeDistance(waypoints, currentGPS.lat, currentGPS.lon)
+      ? calculateCumulativeDistance(
+          routeWaypoints,
+          currentGPS.lat,
+          currentGPS.lon
+        )
       : 0;
 
     const waypoint = {
@@ -1711,8 +1177,8 @@ const libraries = []; // declared outside the component or at top level
   const startEditingWaypoint = (index) => {
     setEditingWaypoint(index);
     setEditValues({
-      name: waypoints[index].name,
-      poi: waypoints[index].poi || "",
+      name: routeWaypoints[index].name,
+      poi: routeWaypoints[index].poi || "",
     });
   };
 
@@ -1768,10 +1234,10 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const selectAllWaypoints = () => {
-    if (selectedWaypoints.size === waypoints.length) {
+    if (selectedWaypoints.size === routeWaypoints.length) {
       setSelectedWaypoints(new Set());
     } else {
-      setSelectedWaypoints(new Set(waypoints.map((_, index) => index)));
+      setSelectedWaypoints(new Set(routeWaypoints.map((_, index) => index)));
     }
   };
 
@@ -1801,11 +1267,11 @@ const libraries = []; // declared outside the component or at top level
 
     if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
 
-    console.log(`🗑️ Deleted ${selectedWaypoints.size} waypoints`);
+    console.log(`🗑️ Deleted ${selectedWaypoints.size} routeWaypoints`);
   };
 
   const handleUndoLastWaypoint = () => {
-    if (waypoints.length === 0) return;
+    if (routeWaypoints.length === 0) return;
 
     setWaypoints((prev) => prev.slice(0, -1));
 
@@ -1818,7 +1284,7 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const exportAsJSON = async (
-    waypointsData = waypoints,
+    waypointsData = routeWaypoints,
     trackingData = trackingPoints,
     name = "stage"
   ) => {
@@ -1851,7 +1317,7 @@ const libraries = []; // declared outside the component or at top level
           hasTracking: trackingData.length > 0,
           trackingPoints: trackingData.length,
         },
-        waypoints: waypointsData.map((wp, index) => ({
+        routeWaypoints: waypointsData.map((wp, index) => ({
           id: index + 1,
           name: wp.name,
           coordinates: { lat: wp.lat, lon: wp.lon, accuracy: gpsAccuracy },
@@ -1907,7 +1373,7 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const exportAsSimpleJSON = async (
-    waypointsData = waypoints,
+    waypointsData = routeWaypoints,
     trackingData = trackingPoints,
     name = "stage"
   ) => {
@@ -1918,7 +1384,7 @@ const libraries = []; // declared outside the component or at top level
         name: routeName || name,
         stageName: stageName,
         date: new Date().toISOString(),
-        waypoints: waypointsData.map((wp, index) => ({
+        routeWaypoints: waypointsData.map((wp, index) => ({
           name: wp.name,
           lat: wp.lat,
           lon: wp.lon,
@@ -1956,7 +1422,7 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const exportAsGPX = async (
-    waypointsData = waypoints,
+    waypointsData = routeWaypoints,
     trackingData = trackingPoints,
     name = "route"
   ) => {
@@ -1982,7 +1448,7 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const exportAsRallyNavigatorGPX = async (
-    waypointsData = waypoints,
+    waypointsData = routeWaypoints,
     trackingData = trackingPoints,
     name = "route"
   ) => {
@@ -1992,66 +1458,66 @@ const libraries = []; // declared outside the component or at top level
       );
 
       const rallyGPX = `<?xml version="1.0" encoding="UTF-8"?>
-  <gpx version="1.1" creator="RallyMapper-Voice" xmlns="http://www.topografix.com/GPX/1/1">
-    <metadata>
-      <n>${name}</n>
-      <desc>Rally route with voice instructions - ${
-        waypointsData.length
-      } waypoints</desc>
-      <time>${new Date().toISOString()}</time>
-    </metadata>
-    
-    <!-- Waypoints with Rally Navigator friendly format -->
-    ${waypointsData
-      .map((wp, index) => {
-        const waypointNumber = (index + 1).toString().padStart(3, "0");
-        return `
-    <wpt lat="${wp.lat}" lon="${wp.lon}">
-      <n>${waypointNumber} - ${wp.name}</n>
-      <desc>${wp.name}</desc>
-      <cmt>Rally instruction: ${wp.name} at ${wp.distance}km</cmt>
-      <type>waypoint</type>
-    </wpt>`;
-      })
-      .join("")}
-  
-    <!-- Route with turn instructions -->
-    <rte>
-      <n>${name} Instructions</n>
-      <desc>Rally route with ${waypointsData.length} instruction points</desc>
+    <gpx version="1.1" creator="RallyMapper-Voice" xmlns="http://www.topografix.com/GPX/1/1">
+      <metadata>
+        <n>${name}</n>
+        <desc>Rally route with voice instructions - ${
+          waypointsData.length
+        } routeWaypoints</desc>
+        <time>${new Date().toISOString()}</time>
+      </metadata>
+      
+      <!-- Waypoints with Rally Navigator friendly format -->
       ${waypointsData
         .map((wp, index) => {
           const waypointNumber = (index + 1).toString().padStart(3, "0");
           return `
-      <rtept lat="${wp.lat}" lon="${wp.lon}">
+      <wpt lat="${wp.lat}" lon="${wp.lon}">
         <n>${waypointNumber} - ${wp.name}</n>
         <desc>${wp.name}</desc>
-        <cmt>${wp.name}</cmt>
-      </rtept>`;
+        <cmt>Rally instruction: ${wp.name} at ${wp.distance}km</cmt>
+        <type>waypoint</type>
+      </wpt>`;
         })
         .join("")}
-    </rte>
-  
-    ${
-      trackingData.length > 0
-        ? `
-    <!-- GPS Track -->
-    <trk>
-      <n>${name} Track</n>
-      <trkseg>
-        ${trackingData
-          .map(
-            (pt) => `
-        <trkpt lat="${pt.lat}" lon="${pt.lon}">
-          <time>${pt.timestamp || new Date().toISOString()}</time>
-        </trkpt>`
-          )
+
+      <!-- Route with turn instructions -->
+      <rte>
+        <n>${name} Instructions</n>
+        <desc>Rally route with ${waypointsData.length} instruction points</desc>
+        ${waypointsData
+          .map((wp, index) => {
+            const waypointNumber = (index + 1).toString().padStart(3, "0");
+            return `
+        <rtept lat="${wp.lat}" lon="${wp.lon}">
+          <n>${waypointNumber} - ${wp.name}</n>
+          <desc>${wp.name}</desc>
+          <cmt>${wp.name}</cmt>
+        </rtept>`;
+          })
           .join("")}
-      </trkseg>
-    </trk>`
-        : ""
-    }
-  </gpx>`;
+      </rte>
+
+      ${
+        trackingData.length > 0
+          ? `
+      <!-- GPS Track -->
+      <trk>
+        <n>${name} Track</n>
+        <trkseg>
+          ${trackingData
+            .map(
+              (pt) => `
+          <trkpt lat="${pt.lat}" lon="${pt.lon}">
+            <time>${pt.timestamp || new Date().toISOString()}</time>
+          </trkpt>`
+            )
+            .join("")}
+        </trkseg>
+      </trk>`
+          : ""
+      }
+    </gpx>`;
 
       const result = await exportFileIPadCompatible(
         rallyGPX,
@@ -2069,7 +1535,7 @@ const libraries = []; // declared outside the component or at top level
   };
 
   const exportAsKML = async (
-    waypointsData = waypoints,
+    waypointsData = routeWaypoints,
     trackingData = trackingPoints,
     name = "route"
   ) => {
@@ -2099,24 +1565,26 @@ const libraries = []; // declared outside the component or at top level
       setIsFollowingGPS(true);
 
       const stageNameFormatted = `${todayDate}/Stage ${stageCount}`;
-      const currentstage = { name: stageNameFormatted, waypoints };
+      const currentstage = { name: stageNameFormatted, routeWaypoints };
 
       const summary = {
         name: stageNameFormatted,
-        waypointCount: waypoints.length,
-        startTime: waypoints[0]?.timestamp || "N/A",
-        endTime: waypoints[waypoints.length - 1]?.timestamp || "N/A",
-        totalDistance: waypoints
+        waypointCount: routeWaypoints.length,
+        startTime: routeWaypoints[0]?.timestamp || "N/A",
+        endTime: routeWaypoints[routeWaypoints.length - 1]?.timestamp || "N/A",
+        totalDistance: routeWaypoints
           .reduce((sum, wp) => sum + parseFloat(wp.distance || 0), 0)
           .toFixed(2),
-        pois: [...new Set(waypoints.map((wp) => wp.poi).filter(Boolean))],
-        startCoords: waypoints[0]
-          ? `${waypoints[0].lat.toFixed(5)}, ${waypoints[0].lon.toFixed(5)}`
+        pois: [...new Set(routeWaypoints.map((wp) => wp.poi).filter(Boolean))],
+        startCoords: routeWaypoints[0]
+          ? `${routeWaypoints[0].lat.toFixed(
+              5
+            )}, ${routeWaypoints[0].lon.toFixed(5)}`
           : "N/A",
-        endCoords: waypoints[waypoints.length - 1]
-          ? `${waypoints[waypoints.length - 1].lat.toFixed(5)}, ${waypoints[
-              waypoints.length - 1
-            ].lon.toFixed(5)}`
+        endCoords: routeWaypoints[routeWaypoints.length - 1]
+          ? `${routeWaypoints[routeWaypoints.length - 1].lat.toFixed(
+              5
+            )}, ${routeWaypoints[routeWaypoints.length - 1].lon.toFixed(5)}`
           : "N/A",
         routeName: routeName || "Unnamed Route",
       };
@@ -2130,7 +1598,7 @@ const libraries = []; // declared outside the component or at top level
 
       console.log("🔍 === MAIN EXPORT PROCESS START ===");
       console.log("Export name:", exportName);
-      console.log("Waypoints:", waypoints.length);
+      console.log("Waypoints:", routeWaypoints.length);
       console.log("Tracking points:", trackingPoints.length);
 
       // SUPABASE INTEGRATION (if user is logged in)
@@ -2155,8 +1623,8 @@ const libraries = []; // declared outside the component or at top level
               stageName: stageNameFormatted,
               stageNumber: stageCount,
               startGPS: startGPS,
-              startTime: waypoints[0]?.fullTimestamp,
-              waypoints: waypoints,
+              startTime: routeWaypoints[0]?.fullTimestamp,
+              routeWaypoints: routeWaypoints,
             },
             routeId
           );
@@ -2179,23 +1647,35 @@ const libraries = []; // declared outside the component or at top level
       try {
         console.log("📤 Starting sequential exports...");
 
-        const json1 = await exportAsJSON(waypoints, trackingPoints, exportName);
+        const json1 = await exportAsJSON(
+          routeWaypoints,
+          trackingPoints,
+          exportName
+        );
         exportResults.push(json1);
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         const json2 = await exportAsSimpleJSON(
-          waypoints,
+          routeWaypoints,
           trackingPoints,
           exportName
         );
         exportResults.push(json2);
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        const gpx = await exportAsGPX(waypoints, trackingPoints, exportName);
+        const gpx = await exportAsGPX(
+          routeWaypoints,
+          trackingPoints,
+          exportName
+        );
         exportResults.push(gpx);
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        const kml = await exportAsKML(waypoints, trackingPoints, exportName);
+        const kml = await exportAsKML(
+          routeWaypoints,
+          trackingPoints,
+          exportName
+        );
         exportResults.push(kml);
 
         console.log("📤 All sequential exports completed");
@@ -2236,7 +1716,7 @@ const libraries = []; // declared outside the component or at top level
       setIsTracking(false);
       localStorage.removeItem("unsavedWaypoints");
 
-      if (waypoints.length === 0) {
+      if (routeWaypoints.length === 0) {
         localStorage.removeItem("current_route_id");
       }
 
@@ -2273,15 +1753,17 @@ const libraries = []; // declared outside the component or at top level
     );
   }
 
-  const routePath = waypoints.map((wp) => ({
+  const routePath = routeWaypoints.map((wp) => ({
     lat: wp.lat,
     lng: wp.lon,
   }));
 
   const routeDistance =
-    waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0;
+    routeWaypoints.length > 0
+      ? routeWaypoints[routeWaypoints.length - 1].distance
+      : 0;
   const routeStats = {
-    totalWaypoints: waypoints.length,
+    totalWaypoints: routeWaypoints.length,
     routeDistance: routeDistance,
     avgSpeed:
       isTracking && trackingPoints.length > 1
@@ -2430,8 +1912,8 @@ const libraries = []; // declared outside the component or at top level
               lineHeight: "1.5",
             }}
           >
-            This will clear your current {waypoints.length} waypoint
-            {waypoints.length !== 1 ? "s" : ""} and start fresh. Make sure
+            This will clear your current {routeWaypoints.length} waypoint
+            {routeWaypoints.length !== 1 ? "s" : ""} and start fresh. Make sure
             you've exported your current data first.
           </p>
           <div style={{ display: "flex", gap: "12px" }}>
@@ -2520,8 +2002,8 @@ const libraries = []; // declared outside the component or at top level
               lineHeight: "1.5",
             }}
           >
-            This will export your route data and clear current waypoints. This
-            action cannot be undone.
+            This will export your route data and clear current routeWaypoints.
+            This action cannot be undone.
           </p>
           <div style={{ display: "flex", gap: "12px" }}>
             <button
@@ -2606,7 +2088,7 @@ const libraries = []; // declared outside the component or at top level
   );
 
   const RouteStatsOverlay = () => {
-    if (!showRouteStats || waypoints.length === 0) {
+    if (!showRouteStats || routeWaypoints.length === 0) {
       return null;
     }
 
@@ -2725,7 +2207,7 @@ const libraries = []; // declared outside the component or at top level
           {showReplay ? "Hide" : "Show"} Route Replay
         </button>
 
-        {showReplay && <ReplayRoute waypoints={waypoints} />}
+        {showReplay && <ReplayRoute routeWaypoints={routeWaypoints} />}
 
         <button
           onClick={recenterOnGPS}
@@ -2803,7 +2285,7 @@ const libraries = []; // declared outside the component or at top level
                   />
                 )}
 
-                {waypoints.map((wp, index) => {
+                {routeWaypoints.map((wp, index) => {
                   if (!wp.lat || !wp.lon) {
                     console.warn(
                       `⚠️ Skipping invalid waypoint at index ${index}`,
@@ -2856,44 +2338,45 @@ const libraries = []; // declared outside the component or at top level
                   />
                 )}
 
-                {selectedWaypoint !== null && waypoints[selectedWaypoint] && (
-                  <InfoWindow
-                    position={{
-                      lat: waypoints[selectedWaypoint].lat,
-                      lng: waypoints[selectedWaypoint].lon,
-                    }}
-                    onCloseClick={() => setSelectedWaypoint(null)}
-                  >
-                    <div className="p-2 max-w-xs">
-                      <div className="flex items-center mb-2">
-                        <strong className="text-lg">
-                          {waypoints[selectedWaypoint].name}
-                        </strong>
-                      </div>
-                      <div className="space-y-1 text-sm">
-                        <div>
-                          <strong>Time:</strong>{" "}
-                          {waypoints[selectedWaypoint].timestamp}
+                {selectedWaypoint !== null &&
+                  routeWaypoints[selectedWaypoint] && (
+                    <InfoWindow
+                      position={{
+                        lat: routeWaypoints[selectedWaypoint].lat,
+                        lng: routeWaypoints[selectedWaypoint].lon,
+                      }}
+                      onCloseClick={() => setSelectedWaypoint(null)}
+                    >
+                      <div className="p-2 max-w-xs">
+                        <div className="flex items-center mb-2">
+                          <strong className="text-lg">
+                            {routeWaypoints[selectedWaypoint].name}
+                          </strong>
                         </div>
-                        <div>
-                          <strong>Position:</strong>{" "}
-                          {waypoints[selectedWaypoint].lat.toFixed(6)},{" "}
-                          {waypoints[selectedWaypoint].lon.toFixed(6)}
-                        </div>
-                        <div>
-                          <strong>Distance from start:</strong>{" "}
-                          {waypoints[selectedWaypoint].distance} km
-                        </div>
-                        {waypoints[selectedWaypoint].poi && (
+                        <div className="space-y-1 text-sm">
                           <div>
-                            <strong>Notes:</strong>{" "}
-                            {waypoints[selectedWaypoint].poi}
+                            <strong>Time:</strong>{" "}
+                            {routeWaypoints[selectedWaypoint].timestamp}
                           </div>
-                        )}
+                          <div>
+                            <strong>Position:</strong>{" "}
+                            {routeWaypoints[selectedWaypoint].lat.toFixed(6)},{" "}
+                            {routeWaypoints[selectedWaypoint].lon.toFixed(6)}
+                          </div>
+                          <div>
+                            <strong>Distance from start:</strong>{" "}
+                            {routeWaypoints[selectedWaypoint].distance} km
+                          </div>
+                          {routeWaypoints[selectedWaypoint].poi && (
+                            <div>
+                              <strong>Notes:</strong>{" "}
+                              {routeWaypoints[selectedWaypoint].poi}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </InfoWindow>
-                )}
+                    </InfoWindow>
+                  )}
               </GoogleMap>
             </>
           )}
@@ -2955,7 +2438,7 @@ const libraries = []; // declared outside the component or at top level
               <button
                 className="bg-green-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
                 onClick={() => {
-                  if (waypoints.length > 0) {
+                  if (routeWaypoints.length > 0) {
                     setShowStartstageConfirm(true);
                   } else {
                     handleStartstage();
@@ -2976,7 +2459,7 @@ const libraries = []; // declared outside the component or at top level
               <button
                 className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-red-600 disabled:cursor-not-allowed text-sm"
                 onClick={() => setShowEndstageConfirm(true)}
-                disabled={waypoints.length === 0}
+                disabled={routeWaypoints.length === 0}
               >
                 ⏹ End Stage
               </button>
@@ -3145,9 +2628,13 @@ const libraries = []; // declared outside the component or at top level
                 🧭 Current Stage Waypoints
               </h2>
 
-              {waypoints.length > 0 && (
+              {routeWaypoints.length > 0 && (
                 <div
-                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
                 >
                   {bulkSelectMode && (
                     <>
@@ -3158,7 +2645,7 @@ const libraries = []; // declared outside the component or at top level
                         onClick={selectAllWaypoints}
                         className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
                       >
-                        {selectedWaypoints.size === waypoints.length
+                        {selectedWaypoints.size === routeWaypoints.length
                           ? "Deselect All"
                           : "Select All"}
                       </button>
@@ -3194,8 +2681,8 @@ const libraries = []; // declared outside the component or at top level
                 paddingRight: "4px",
               }}
             >
-              {waypoints.length === 0 ? (
-                <p className="text-gray-500">No waypoints added yet.</p>
+              {routeWaypoints.length === 0 ? (
+                <p className="text-gray-500">No routeWaypoints added yet.</p>
               ) : (
                 <div
                   style={{
@@ -3204,7 +2691,7 @@ const libraries = []; // declared outside the component or at top level
                     gap: "8px",
                   }}
                 >
-                  {waypoints.map((wp, idx) => (
+                  {routeWaypoints.map((wp, idx) => (
                     <div key={idx} className="bg-gray-100 p-3 rounded">
                       {bulkSelectMode && (
                         <div
@@ -3410,20 +2897,517 @@ const libraries = []; // declared outside the component or at top level
     </div>
   );
 }
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [isGuestMode, setIsGuestMode] = useState(false);
-  
+
+const UserProfile = ({ user, onClose, onAccountDeleted }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [profile, setProfile] = useState({
+    displayName: user?.user_metadata?.full_name || "",
+    email: user?.email || "",
+  });
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleUpdateProfile = async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { full_name: profile.displayName },
+      });
+      if (error) throw error;
+      setMessage("Profile updated successfully!");
+      setIsEditing(false);
+    } catch (error) {
+      setMessage(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      setMessage("Passwords do not match");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setMessage("Password must be at least 6 characters");
+      return;
+    }
+    setLoading(true);
+    setMessage("");
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (error) throw error;
+      setMessage("Password changed successfully!");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      setMessage(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route
-          path="/"
-          element={<Home user={user} isGuestMode={isGuestMode} />}
-        />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-      </Routes>
-    </BrowserRouter>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">User Profile</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            ✕
+          </button>
+        </div>
+
+        {message && (
+          <div
+            className={`p-3 rounded mb-4 ${
+              message.includes("Error")
+                ? "bg-red-100 text-red-700"
+                : "bg-green-100 text-green-700"
+            }`}
+          >
+            {message}
+          </div>
+        )}
+
+        {/* Profile Section */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3">Profile Information</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Display Name
+              </label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={profile.displayName}
+                  onChange={(e) =>
+                    setProfile((prev) => ({
+                      ...prev,
+                      displayName: e.target.value,
+                    }))
+                  }
+                  className="w-full p-2 border rounded"
+                />
+              ) : (
+                <p className="p-2 bg-gray-50 rounded">
+                  {profile.displayName || "Not set"}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Email</label>
+              <p className="p-2 bg-gray-50 rounded">{profile.email}</p>
+            </div>
+            <div className="flex gap-2">
+              {isEditing ? (
+                <>
+                  <button
+                    onClick={handleUpdateProfile}
+                    disabled={loading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {loading ? "Updating..." : "Save Changes"}
+                  </button>
+                  <button
+                    onClick={() => setIsEditing(false)}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                >
+                  Edit Profile
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Password Change Section */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3">Change Password</h3>
+          <div className="space-y-3">
+            <input
+              type="password"
+              placeholder="New Password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+            <input
+              type="password"
+              placeholder="Confirm New Password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+            <button
+              onClick={handleChangePassword}
+              disabled={loading || !newPassword || !confirmPassword}
+              className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? "Changing..." : "Change Password"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+function mapCategoryToStandardIcon(category, description) {
+  const text = description.toLowerCase();
+
+  // Map categories and keywords to standard rally icons
+  const iconMapping = {
+    safety: {
+      icon: "danger",
+      gpxType: "danger",
+      priority:
+        text.includes("severe") || text.includes("extreme") ? "high" : "medium",
+    },
+    navigation: {
+      icon: text.includes("left")
+        ? "left"
+        : text.includes("right")
+        ? "right"
+        : text.includes("straight")
+        ? "straight"
+        : "navigation",
+      gpxType: "turn",
+      priority: "high",
+    },
+    surface: {
+      icon: text.includes("bump")
+        ? "bump"
+        : text.includes("hole")
+        ? "hole"
+        : text.includes("rough")
+        ? "bumpy"
+        : "surface",
+      gpxType: "hazard",
+      priority: "medium",
+    },
+    obstacle: {
+      icon:
+        text.includes("grid") || text.includes("cattle")
+          ? "grid"
+          : text.includes("gate")
+          ? "fence-gate"
+          : "obstacle",
+      gpxType: "waypoint",
+      priority: "medium",
+    },
+    elevation: {
+      icon:
+        text.includes("summit") || text.includes("peak")
+          ? "summit"
+          : text.includes("hill")
+          ? "uphill"
+          : "elevation",
+      gpxType: "summit",
+      priority: "low",
+    },
+    crossing: {
+      icon: text.includes("bridge")
+        ? "bridge"
+        : text.includes("water") || text.includes("ford")
+        ? "wading"
+        : "crossing",
+      gpxType: "water",
+      priority: "high",
+    },
+    landmark: {
+      icon: "landmark",
+      gpxType: "building",
+      priority: "low",
+    },
+    timing: {
+      icon: "control",
+      gpxType: "checkpoint",
+      priority: "high",
+    },
+  };
+
+  return (
+    iconMapping[category] || {
+      icon: "waypoint",
+      gpxType: "waypoint",
+      priority: "medium",
+    }
   );
 }
+
+function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
+  const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="RallyMapper-Voice-v2.0" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>${name}</name>
+    <desc>Rally route created with RallyMapper Voice Navigation - ${
+      waypoints.length
+    } waypoints</desc>
+    <author>
+      <name>RallyMapper Voice</name>
+    </author>
+    <time>${new Date().toISOString()}</time>
+    <keywords>rally,navigation,voice,waypoints,instructions</keywords>
+  </metadata>`;
+
+  // Enhanced waypoints with Rally Navigator specific formatting
+  const waypointEntries = waypoints
+    .map((wp, index) => {
+      const iconInfo = mapCategoryToStandardIcon(
+        wp.category || "general",
+        wp.name
+      );
+      const isVoiceCreated = wp.voiceCreated ? " (Voice)" : "";
+
+      // Create instruction-friendly name
+      const instructionName = wp.name;
+      const waypointNumber = (index + 1).toString().padStart(3, "0");
+
+      // Fix the timestamp issue - create a proper date
+      const waypointTime = wp.fullTimestamp
+        ? new Date(wp.fullTimestamp).toISOString()
+        : new Date().toISOString();
+
+      return `
+  <wpt lat="${wp.lat}" lon="${wp.lon}">
+    <name>WP${waypointNumber}: ${instructionName}${isVoiceCreated}</name>
+    <desc>${instructionName}</desc>
+    <cmt>${instructionName} - Distance: ${wp.distance}km${
+        wp.speedContext ? " - Speed: " + wp.speedContext : ""
+      }</cmt>
+    <time>${waypointTime}</time>
+    <sym>${iconInfo.icon}</sym>
+    <type>${iconInfo.gpxType}</type>
+    <extensions>
+      <category>${wp.category || "general"}</category>
+      <priority>${iconInfo.priority}</priority>
+      <voice_created>${wp.voiceCreated || false}</voice_created>
+      <rally_icon>${iconInfo.icon}</rally_icon>
+      <instruction>${instructionName}</instruction>
+      <distance_km>${wp.distance}</distance_km>
+      ${
+        wp.speedContext
+          ? `<speed_context>${wp.speedContext}</speed_context>`
+          : ""
+      }
+      ${
+        wp.rawTranscript
+          ? `<original_transcript>${wp.rawTranscript}</original_transcript>`
+          : ""
+      }
+      ${
+        wp.processedText
+          ? `<processed_text>${wp.processedText}</processed_text>`
+          : ""
+      }
+    </extensions>
+  </wpt>`;
+    })
+    .join("");
+
+  // Enhanced route stage with Rally Navigator specific route points
+  const routestage =
+    waypoints.length > 1
+      ? `
+  <rte>
+    <name>${name} - Rally Instructions</name>
+    <desc>Rally navigation route with turn-by-turn instructions - ${
+      waypoints.length
+    } waypoints - Total distance: ${
+          waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0
+        }km</desc>
+    <extensions>
+      <total_waypoints>${waypoints.length}</total_waypoints>
+      <voice_waypoints>${
+        waypoints.filter((wp) => wp.voiceCreated).length
+      }</voice_waypoints>
+      <creation_date>${new Date().toISOString()}</creation_date>
+      <rally_instructions>true</rally_instructions>
+    </extensions>
+    ${waypoints
+      .map((wp, index) => {
+        const iconInfo = mapCategoryToStandardIcon(
+          wp.category || "general",
+          wp.name
+        );
+        const waypointNumber = (index + 1).toString().padStart(3, "0");
+
+        return `
+    <rtept lat="${wp.lat}" lon="${wp.lon}">
+      <name>WP${waypointNumber}: ${wp.name}</name>
+      <desc>${wp.name}</desc>
+      <cmt>${wp.name} - ${wp.distance}km</cmt>
+      <sym>${iconInfo.icon}</sym>
+      <type>${iconInfo.gpxType}</type>
+      <extensions>
+        <rally_instruction>${wp.name}</rally_instruction>
+        <instruction_text>${wp.name}</instruction_text>
+        <distance_from_start>${wp.distance}</distance_from_start>
+        <waypoint_category>${wp.category || "general"}</waypoint_category>
+        <waypoint_number>${index + 1}</waypoint_number>
+        <voice_created>${wp.voiceCreated || false}</voice_created>
+      </extensions>
+    </rtept>`;
+      })
+      .join("")}
+  </rte>`
+      : "";
+
+  // Enhanced tracking with metadata
+  const trackingSegment =
+    trackingPoints.length > 0
+      ? `
+  <trk>
+    <name>${name} - GPS Track</name>
+    <desc>Auto-recorded GPS breadcrumbs - ${trackingPoints.length} points</desc>
+    <extensions>
+      <track_points>${trackingPoints.length}</track_points>
+      <recording_interval>20_seconds</recording_interval>
+    </extensions>
+    <trkseg>
+      ${trackingPoints
+        .map(
+          (pt) => `
+      <trkpt lat="${pt.lat}" lon="${pt.lon}">
+        <time>${pt.timestamp || new Date().toISOString()}</time>
+      </trkpt>`
+        )
+        .join("")}
+    </trkseg>
+  </trk>`
+      : "";
+
+  const gpxFooter = `
+</gpx>`;
+
+  return gpxHeader + waypointEntries + routestage + trackingSegment + gpxFooter;
+}
+
+function buildKML(waypoints = [], trackingPoints = [], name = "Route") {
+  const kmlHeader = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${name}</name>
+    <description>Rally route - ${waypoints.length} waypoints</description>
+    
+    <!-- Waypoint Folder -->
+    <Folder>
+      <name>Waypoints</name>
+      <description>Rally waypoints</description>`;
+
+  // Individual waypoint placemarks
+  const waypointPlacemarks = waypoints
+    .map(
+      (wp, index) => `
+      <Placemark>
+        <name>WP${(index + 1).toString().padStart(2, "0")} ${wp.name}</name>
+        <description>${wp.name} - ${wp.distance}km${
+        wp.voiceCreated ? " (Voice)" : ""
+      }</description>
+        <Point>
+          <coordinates>${wp.lon},${wp.lat},0</coordinates>
+        </Point>
+      </Placemark>`
+    )
+    .join("");
+
+  const waypointFolderClose = `
+    </Folder>`;
+
+  // Tracking folder
+  const trackingFolder =
+    trackingPoints.length > 0
+      ? `
+    <Folder>
+      <name>GPS Track</name>
+      <description>Auto-recorded GPS track</description>
+      <Placemark>
+        <name>${name} Track</name>
+        <description>GPS breadcrumbs - ${
+          trackingPoints.length
+        } points</description>
+        <LineString>
+          <tessellate>1</tessellate>
+          <coordinates>
+            ${trackingPoints
+              .map((pt) => `${pt.lon},${pt.lat},0`)
+              .join("\n            ")}
+          </coordinates>
+        </LineString>
+      </Placemark>
+    </Folder>`
+      : "";
+
+  return (
+    kmlHeader +
+    waypointPlacemarks +
+    waypointFolderClose +
+    trackingFolder +
+    `
+  </Document>
+</kml>`
+  );
+}
+
+function App() {
+  const [user, setUser] = React.useState(null);
+  const [authLoading, setAuthLoading] = React.useState(true);
+  const [guest, setGuest] = React.useState(false);
+
+  React.useEffect(() => {
+    let sub;
+    (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+      const ch = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+        setAuthLoading(false);
+      });
+      sub = ch?.data?.subscription;
+    })();
+    return () => {
+      try {
+        sub?.unsubscribe?.();
+      } catch {}
+    };
+  }, []);
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Checking session…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user && !guest) {
+    return <Auth onGuest={() => setGuest(true)} />;
+  }
+
+  return <Home user={user} isGuestMode={!user && guest} />;
+}
+
+export default App;

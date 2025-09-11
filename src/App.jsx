@@ -2181,7 +2181,7 @@ function Home({ user, isGuestMode }) {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold text-blue-800 flex items-center gap-2">
           <img src="/RRM Logo 64x64.png" className="w-8 h-8" alt="RRM Logo" />
-          Rally Route Mapper
+          Rally Mapper
         </h1>
       </div>
 

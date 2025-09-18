@@ -2674,7 +2674,7 @@ function Home({ user, isGuestMode }) {
               transition: "all 0.2s",
               display: "flex",
               alignItems: "center",
-              gap: "12px",
+              gap: "8px",
               backgroundColor: !stageStarted
                 ? "#e98547"
                 : recognitionActive

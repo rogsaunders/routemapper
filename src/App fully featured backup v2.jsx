@@ -1211,7 +1211,7 @@ function Home({ user, isGuestMode }) {
           transition: "all 0.2s",
           display: "flex",
           alignItems: "center",
-          gap: "12px",
+          gap: "8px",
           backgroundColor: continuousListening ? "#EF4444" : "#16a34a",
           color: "white",
           cursor: "pointer",

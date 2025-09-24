@@ -107,7 +107,7 @@ export default function Auth({ onAuthSuccess, onGuest }) {
   };
 
   const inputStyle = {
-    width: "275px",
+    width: "375px",
     padding: "0.75rem",
     border: "1px solid #d1d5db",
     borderRadius: "6px",
@@ -251,7 +251,7 @@ export default function Auth({ onAuthSuccess, onGuest }) {
                   autoComplete={isSignUp ? "new-password" : "current-password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  style={{ ...inputStyle, paddingRight: "3rem" }}
+                  style={{ ...inputStyle, paddingRight: "3 rem" }}
                   placeholder={
                     isSignUp ? "Create a password" : "Enter your password"
                   }

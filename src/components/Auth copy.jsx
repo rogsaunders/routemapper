@@ -1,4 +1,4 @@
-// Auth.jsx — improved spacing and layout
+// Auth.jsx — robust email/password auth with reset & guest mode
 import React, { useState } from "react";
 import { supabase } from "../lib/supabase";
 
@@ -11,6 +11,7 @@ export default function Auth({ onAuthSuccess, onGuest }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const normalTextStyle = { textTransform: "none" };
 
   const resetAlerts = () => {
     setMessage("");
@@ -89,169 +90,71 @@ export default function Auth({ onAuthSuccess, onGuest }) {
     }
   };
 
-  const containerStyle = {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "1rem",
-  };
-
-  const formContainerStyle = {
-    width: "100%",
-    maxWidth: "400px",
-    backgroundColor: "white",
-    borderRadius: "12px",
-    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-    padding: "2rem",
-  };
-
-  const inputStyle = {
-    width: "275px",
-    padding: "0.75rem",
-    border: "1px solid #d1d5db",
-    borderRadius: "6px",
-    fontSize: "1rem",
-    fontFamily: "inherit",
-  };
-
-  const buttonStyle = {
-    width: "100%",
-    padding: "0.75rem 1rem",
-    borderRadius: "6px",
-    fontSize: "1rem",
-    fontWeight: "500",
-    border: "none",
-    cursor: "pointer",
-    fontFamily: "inherit",
-  };
-
-  const primaryButtonStyle = {
-    ...buttonStyle,
-    backgroundColor: loading ? "#60a5fa" : "#2563eb",
-    color: "white",
-    cursor: loading ? "not-allowed" : "pointer",
-  };
-
-  const secondaryButtonStyle = {
-    ...buttonStyle,
-    backgroundColor: "white",
-    color: "#374151",
-    border: "1px solid #d1d5db",
-  };
-
   return (
-    <div className="bg-gray-100" style={containerStyle}>
-      <div style={formContainerStyle}>
-        <h1
-          style={{
-            fontSize: "1.5rem",
-            fontWeight: "600",
-            marginBottom: "0.5rem",
-            color: "#111827",
-          }}
-        >
+    <div
+      className="min-h-screen flex items-center justify-center bg-gray-100 p-4"
+      style={normalTextStyle}
+    >
+      <div className="w-full max-w-md bg-white rounded-xl shadow-md p-6">
+        <h1 className="text-2xl font-semibold mb-1 text-gray-900">
           {isReset ? "Reset Password" : isSignUp ? "Create Account" : "Sign In"}
         </h1>
-        <p
-          style={{
-            fontSize: "0.875rem",
-            color: "#6b7280",
-            marginBottom: "2rem",
-          }}
-        >
+        <p className="text-sm text-gray-500 mb-6">
           {isReset
-            ? "Enter your email and we'll send you a reset link."
+            ? "Enter your email and we will send you a reset link."
             : isSignUp
             ? "Create your Rally Mapper account."
             : "Sign in to continue to Rally Mapper."}
         </p>
 
         {message && (
-          <div
-            style={{
-              marginBottom: "1rem",
-              padding: "0.75rem",
-              backgroundColor: "#f0fdf4",
-              color: "#166534",
-              border: "1px solid #bbf7d0",
-              borderRadius: "6px",
-              fontSize: "0.875rem",
-            }}
-          >
+          <div className="mb-3 rounded-md bg-green-50 text-green-800 border border-green-200 px-3 py-2 text-sm">
             {message}
           </div>
         )}
-
         {error && (
-          <div
-            style={{
-              marginBottom: "1rem",
-              padding: "0.75rem",
-              backgroundColor: "#fef2f2",
-              color: "#991b1b",
-              border: "1px solid #fecaca",
-              borderRadius: "6px",
-              fontSize: "0.875rem",
-            }}
-          >
+          <div className="mb-3 rounded-md bg-red-50 text-red-800 border border-red-200 px-3 py-2 text-sm">
             {error}
           </div>
         )}
 
-        <form
-          onSubmit={handleAuth}
-          style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
-        >
-          {/* Email Field */}
+        <form onSubmit={handleAuth} className="space-y-4">
           <div>
             <label
               htmlFor="email"
-              style={{
-                display: "block",
-                fontSize: "0.875rem",
-                fontWeight: "500",
-                color: "#374151",
-                marginBottom: "0.5rem",
-              }}
+              className="block text-sm font-medium text-gray-700 mb-1"
             >
               Email
             </label>
             <input
               id="email"
-              type="email"
+              type="email:"
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              style={inputStyle}
+              className="w-9/12 rounded-md border border-gray-300 px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="you@example.com"
               required
             />
           </div>
 
-          {/* Password Field */}
           {!isReset && (
             <div>
               <label
                 htmlFor="password"
-                style={{
-                  display: "block",
-                  fontSize: "0.875rem",
-                  fontWeight: "500",
-                  color: "#374151",
-                  marginBottom: "0.5rem",
-                }}
+                className="block text-sm font-medium text-gray-700 mb-1"
               >
                 Password
               </label>
-              <div style={{ position: "relative" }}>
+              //
+              <div className="relative">
                 <input
                   id="password"
                   type={showPw ? "text" : "password"}
                   autoComplete={isSignUp ? "new-password" : "current-password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  style={{ ...inputStyle, paddingRight: "3rem" }}
+                  className="w-1/2  rounded-md border border-gray-300 px-3 py-1.5 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder={
                     isSignUp ? "Create a password" : "Enter your password"
                   }
@@ -261,25 +164,25 @@ export default function Auth({ onAuthSuccess, onGuest }) {
                 <button
                   type="button"
                   onClick={() => setShowPw((s) => !s)}
-                  style={{
-                    position: "absolute",
-                    right: "0.75rem",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "none",
-                    border: "none",
-                    fontSize: "0.875rem",
-                    color: "#6b7280",
-                    cursor: "pointer",
-                  }}
+                  className="absolute inset-y-0 right-0 px-3 text-sm text-gray-500 hover:text-gray-700"
+                  aria-label={showPw ? "Hide password" : "Show password"}
                 >
                   {showPw ? "Hide" : "Show"}
                 </button>
+                //
               </div>
             </div>
           )}
 
-          <button type="submit" disabled={loading} style={primaryButtonStyle}>
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-3/4 rounded-md px-3 py-1 text-white font-medium ${
+              loading
+                ? "bg-blue-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
+          >
             {loading
               ? "Please wait…"
               : isReset
@@ -289,14 +192,7 @@ export default function Auth({ onAuthSuccess, onGuest }) {
               : "Sign In"}
           </button>
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: "0.875rem",
-              gap: "1rem",
-            }}
-          >
+          <div className="flex items-center justify-between text-sm">
             {!isReset && (
               <button
                 type="button"
@@ -304,13 +200,7 @@ export default function Auth({ onAuthSuccess, onGuest }) {
                   resetAlerts();
                   setIsSignUp((s) => !s);
                 }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#1d4ed8",
-                  cursor: "pointer",
-                  textDecoration: "underline",
-                }}
+                className="text-blue-700 hover:underline"
               >
                 {isSignUp
                   ? "Have an account? Sign in"
@@ -323,42 +213,23 @@ export default function Auth({ onAuthSuccess, onGuest }) {
                 resetAlerts();
                 setIsReset((r) => !r);
               }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#6b7280",
-                cursor: "pointer",
-                textDecoration: "underline",
-                marginLeft: "auto",
-              }}
+              className="text-gray-600 hover:underline ml-auto"
             >
               {isReset ? "Back to sign in" : "Forgot password?"}
             </button>
           </div>
 
-          <div style={{ paddingTop: "1rem" }}>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-              }}
-            >
+          <div className="pt-2">
+            <div className="flex flex-col gap-2">
               <button
                 type="button"
                 onClick={() => onGuest?.()}
-                style={secondaryButtonStyle}
+                className="w-3/4 rounded-md px-3 py-1 font-medium border border-gray-300 hover:bg-gray-50"
               >
                 Continue as Guest
               </button>
-              <p
-                style={{
-                  fontSize: "0.75rem",
-                  color: "#6b7280",
-                  textAlign: "center",
-                }}
-              >
-                Guest mode: data is stored locally and won't sync to cloud.
+              <p className="text-xs text-gray-500 text-center">
+                Guest mode: data is stored locally and won’t sync to cloud.
               </p>
             </div>
           </div>

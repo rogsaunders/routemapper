@@ -2605,7 +2605,7 @@ function Home({ user, isGuestMode }) {
           >
             <span
               style={{
-                fontSize: "1.5rem",
+                fontSize: "1.0rem",
                 textAlign: "center",
                 lineHeight: "1.2",
                 padding: "8px",
@@ -2635,7 +2635,7 @@ function Home({ user, isGuestMode }) {
                   : "#16a34a",
               color: "white",
               cursor: !currentGPS || !stageStarted ? "not-allowed" : "pointer",
-              border: "2px solid #1e3a8a",
+              //border: "2px solid #1e3a8a",
             }}
           >
             {waypointAdded ? <>✅ Added!</> : <>📍 Add Waypoint</>}
@@ -2651,7 +2651,7 @@ function Home({ user, isGuestMode }) {
                 fontSize: "1rem",
                 backgroundColor: "#EF4444",
                 color: "white",
-                border: "2px solid #1e3a8a",
+                //border: "2px solid #1e3a8a",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
@@ -2682,7 +2682,7 @@ function Home({ user, isGuestMode }) {
                 : "#16a34a",
               color: "white",
               cursor: !stageStarted ? "not-allowed" : "pointer",
-              border: "2px solid #1e3a8a",
+              //border: "2px solid #1e3a8a",
               boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
             }}
           >
@@ -2705,7 +2705,7 @@ function Home({ user, isGuestMode }) {
               fontSize: "1.0rem",
               backgroundColor: !stageStarted ? "#e98547" : "#D1D5DB",
               color: "white",
-              border: "2px solid #1e3a8a",
+              //border: "2px solid #1e3a8a",
               cursor: !stageStarted ? "not-allowed" : "pointer",
             }}
             onClick={() => alert("Photo feature not yet implemented")}

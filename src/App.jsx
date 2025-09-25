@@ -1909,7 +1909,7 @@ function Home({ user, isGuestMode }) {
   const GPSStatus = () => {
     if (gpsError) {
       return (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-2">
           <div className="flex items-center">
             <span className="text-red-500 mr-2">⚠️</span>
             <div className="flex-1">
@@ -1928,7 +1928,7 @@ function Home({ user, isGuestMode }) {
 
     if (gpsLoading || !currentGPS?.lat || !currentGPS?.lon) {
       return (
-        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-2">
           <div className="flex items-center">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600 mr-2"></div>
             <span>Acquiring GPS signal... Please wait.</span>
@@ -1938,7 +1938,7 @@ function Home({ user, isGuestMode }) {
     }
 
     return (
-      <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+      <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <span className="text-green-500 mr-2">📍</span>
@@ -2304,7 +2304,7 @@ function Home({ user, isGuestMode }) {
 
       <GPSStatus />
 
-      <div className="flex gap-4 mb-4">
+      <div className="flex gap-4 mb-2">
         <button
           className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700 text-sm"
           onClick={() => setShowMap((prev) => !prev)}

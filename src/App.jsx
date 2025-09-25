@@ -2799,7 +2799,7 @@ function Home({ user, isGuestMode }) {
               }}
             >
               {routeWaypoints.length === 0 ? (
-                <p className="text-gray-500">No routeWaypoints added yet.</p>
+                <p className="text-gray-500">No route Waypoints added yet.</p>
               ) : (
                 <div
                   style={{

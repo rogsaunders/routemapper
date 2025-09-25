@@ -2253,7 +2253,24 @@ function Home({ user, isGuestMode }) {
 
       {/* Sync Status Indicator */}
       <div className="fixed top-4 right-4 z-50">
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex items-center gap-2">
+          <div className="flex gap-2">
+            {user && user !== "guest" && (
+              <button
+                onClick={() => setShowUserProfile(true)}
+                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+              >
+                👤 {user.email?.split("@")[0] || "User"}
+              </button>
+            )}
+            <button
+              onClick={handleSignOut}
+              className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+            >
+              {user === "guest" ? "Exit Guest" : "Sign Out"}
+            </button>
+          </div>
+
           <div
             className={`px-3 py-1 rounded-full text-sm flex items-center gap-2 ${
               syncStatus === "synced"
@@ -2270,23 +2287,6 @@ function Home({ user, isGuestMode }) {
             {syncStatus === "error" && "⚠️ Sync Error"}
             {syncStatus === "offline" &&
               (isGuestMode ? "🔒 Guest Mode" : "💾 Local Only")}
-          </div>
-
-          <div className="flex gap-2">
-            {user && user !== "guest" && (
-              <button
-                onClick={() => setShowUserProfile(true)}
-                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
-              >
-                👤 {user.email?.split("@")[0] || "User"}
-              </button>
-            )}
-            <button
-              onClick={handleSignOut}
-              className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
-            >
-              {user === "guest" ? "Exit Guest" : "Sign Out"}
-            </button>
           </div>
         </div>
       </div>
@@ -2509,11 +2509,11 @@ function Home({ user, isGuestMode }) {
         <div className="flex flex-wrap gap-2 mb-2">
           <div className="flex flex-col justify-end">
             <div className="flex items-center gap-3">
-              <span className="px-3 py-2 bg-blue-100 border rounded text-center font-bold min-w-16">
+              <span className="px-3 py-2 bg-blue-100 border rounded text-sm font-bold min-w-16">
                 Day {currentDay}
               </span>
               <button
-                className="bg-blue-600 text-white px-2 py-2 rounded text-sm hover:bg-blue-700"
+                className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700"
                 onClick={handleNewDay}
                 title="Start new day"
               >
@@ -2543,7 +2543,7 @@ function Home({ user, isGuestMode }) {
 
           <div className="flex flex-col">
             <input
-              className="p-2 border rounded text-sm"
+              className="flex-1 p-2 border rounded text-black bg-gray-100 text-sm"
               placeholder="Stage Number"
               value={stageName}
               onChange={(e) => setstageName(e.target.value)}
@@ -2590,7 +2590,7 @@ function Home({ user, isGuestMode }) {
           <div
             style={{
               width: "128px",
-              height: "28px",
+              height: "12px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -2620,7 +2620,7 @@ function Home({ user, isGuestMode }) {
             type="button"
             disabled={!currentGPS || !stageStarted}
             style={{
-              padding: "18px 16px",
+              padding: "10px 10px",
               borderRadius: "8px",
               fontSize: "1.0rem",
               transition: "all 0.2s",
@@ -2646,7 +2646,7 @@ function Home({ user, isGuestMode }) {
               onClick={handleUndoLastWaypoint}
               type="button"
               style={{
-                padding: "18px 16px",
+                padding: "10px 10px",
                 borderRadius: "8px",
                 fontSize: "1rem",
                 backgroundColor: "#EF4444",
@@ -2668,7 +2668,7 @@ function Home({ user, isGuestMode }) {
             type="button"
             disabled={!stageStarted}
             style={{
-              padding: "18px 16px",
+              padding: "10px 10px",
               borderRadius: "8px",
               fontSize: "1.00rem",
               transition: "all 0.2s",
@@ -2700,7 +2700,7 @@ function Home({ user, isGuestMode }) {
 
           <button
             style={{
-              padding: "18px 16px",
+              padding: "10px 10px",
               borderRadius: "8px",
               fontSize: "1.0rem",
               backgroundColor: !stageStarted ? "#e98547" : "#D1D5DB",
@@ -2760,7 +2760,7 @@ function Home({ user, isGuestMode }) {
                       </span>
                       <button
                         onClick={selectAllWaypoints}
-                        className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                        className="px-2 py-1 bg-blue-500 text-black rounded text-xs hover:bg-blue-600"
                       >
                         {selectedWaypoints.size === routeWaypoints.length
                           ? "Deselect All"
@@ -2769,7 +2769,7 @@ function Home({ user, isGuestMode }) {
                       {selectedWaypoints.size > 0 && (
                         <button
                           onClick={deleteSelectedWaypoints}
-                          className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                          className="px-2 py-1 bg-red-500 text-black rounded text-xs hover:bg-red-600"
                         >
                           Delete ({selectedWaypoints.size})
                         </button>
@@ -2780,7 +2780,7 @@ function Home({ user, isGuestMode }) {
                     onClick={toggleBulkSelectMode}
                     className={`px-3 py-1 rounded text-sm ${
                       bulkSelectMode
-                        ? "bg-gray-500 text-white hover:bg-gray-600"
+                        ? "bg-gray-500 text-black hover:bg-gray-600"
                         : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                     }`}
                   >

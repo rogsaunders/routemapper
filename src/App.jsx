@@ -1205,7 +1205,7 @@ function Home({ user, isGuestMode }) {
         }}
         type="button"
         style={{
-          padding: "18px 16px",
+          padding: "10px 10px",
           borderRadius: "8px",
           fontSize: "1.0rem",
           transition: "all 0.2s",

@@ -8,6 +8,7 @@ import {
 } from "@react-google-maps/api";
 import startSound from "./assets/sounds/start.wav";
 import stopSound from "./assets/sounds/stop.wav";
+import JSZip from "jszip";
 import React, { useEffect, useRef, useState } from "react";
 import ReplayRoute from "./ReplayRoute";
 import { supabase } from "./lib/supabase";
@@ -185,6 +186,7 @@ function Home({ user, isGuestMode }) {
   const [currentRecognition, setCurrentRecognition] = useState(null);
   const [routeName, setRouteName] = useState("");
   const [startGPS, setStartGPS] = useState(null);
+  const [stage, setstage] = useState([]);
   const [stageSummaries, setstageSummaries] = useState([]);
   const [stageName, setstageName] = useState("Stage 1");
   const [trackingPoints, setTrackingPoints] = useState([]);
@@ -218,10 +220,12 @@ function Home({ user, isGuestMode }) {
   const [stageLoading, setstageLoading] = useState(false);
   const [showUndo, setShowUndo] = useState(false);
   const [undoTimeLeft, setUndoTimeLeft] = useState(5);
+  const [showVoiceInstructions, setShowVoiceInstructions] = useState(false);
   const [mapType, setMapType] = useState("roadmap");
   const [showRouteStats, setShowRouteStats] = useState(false);
   const [mapZoom, setMapZoom] = useState(15);
   const [isFollowingGPS, setIsFollowingGPS] = useState(true);
+  const [staticMapCenter, setStaticMapCenter] = useState(null);
   const [userHasInteractedWithMap, setUserHasInteractedWithMap] =
     useState(false);
   const [continuousListening, setContinuousListening] = useState(false);
@@ -1207,11 +1211,11 @@ function Home({ user, isGuestMode }) {
           transition: "all 0.2s",
           display: "flex",
           alignItems: "center",
-          gap: "8px",
+          gap: "12px",
           backgroundColor: continuousListening ? "#EF4444" : "#16a34a",
           color: "white",
           cursor: "pointer",
-          //border: "2px solid #1e3a8a",
+          border: "2px solid #1e3a8a",
           boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
         }}
       >
@@ -1944,7 +1948,7 @@ function Home({ user, isGuestMode }) {
             <span className="mr-3">
               {currentGPS.lat.toFixed(6)}, {currentGPS.lon.toFixed(6)}
             </span>
-            : Accuracy: ±{gpsAccuracy ? Math.round(gpsAccuracy) : "?"}m
+            Accuracy: ±{gpsAccuracy ? Math.round(gpsAccuracy) : "?"}m
             <span
               className={`ml-2 px-2 py-1 rounded text-xs ${
                 gpsAccuracy <= 10
@@ -2591,9 +2595,8 @@ function Home({ user, isGuestMode }) {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: "black",
-              color: "white",
-              //border: "2px solid #1e3a8a",
+              backgroundColor: "white",
+              border: "2px solid #1e3a8a",
               borderRadius: "8px",
               fontWeight: "bold",
               boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",

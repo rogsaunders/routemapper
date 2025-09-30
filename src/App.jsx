@@ -1217,7 +1217,7 @@ function Home({ user, isGuestMode }) {
           backgroundColor: continuousListening ? "#EF4444" : "#16a34a",
           color: "white",
           cursor: "pointer",
-          border: "2px solid #1e3a8a",
+          //border: "2px solid #1e3a8a",
           boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
         }}
       >

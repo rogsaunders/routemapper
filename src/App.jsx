@@ -514,6 +514,8 @@ function Home({ user, isGuestMode }) {
         )
       : 0;
 
+    setTotalDistance(cumulativeDistance);
+
     const waypoint = {
       name: "Unnamed",
       lat: currentGPS.lat,
@@ -1264,6 +1266,8 @@ function Home({ user, isGuestMode }) {
           currentGPS.lon
         )
       : 0;
+
+    setTotalDistance(cumulativeDistance);
 
     const waypoint = {
       name: formattedName,
@@ -2595,7 +2599,8 @@ function Home({ user, isGuestMode }) {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: "blue",
+              backgroundColor: "black",
+              color: "white",
               border: "2px solid #1e3a8a",
               borderRadius: "8px",
               fontWeight: "bold",

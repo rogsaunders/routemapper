@@ -1952,7 +1952,7 @@ function Home({ user, isGuestMode }) {
             <span className="mr-3">
               {currentGPS.lat.toFixed(6)}, {currentGPS.lon.toFixed(6)}
             </span>
-            Accuracy: ±{gpsAccuracy ? Math.round(gpsAccuracy) : "?"}m
+            : Accuracy: ±{gpsAccuracy ? Math.round(gpsAccuracy) : "?"}m
             <span
               className={`ml-2 px-2 py-1 rounded text-xs ${
                 gpsAccuracy <= 10
@@ -1963,10 +1963,10 @@ function Home({ user, isGuestMode }) {
               }`}
             >
               {gpsAccuracy <= 10
-                ? "Excellent"
+                ? " Excellent"
                 : gpsAccuracy <= 50
-                ? "Good"
-                : "Poor"}
+                ? " Good"
+                : " Poor"}
             </span>
           </div>
         </div>
@@ -2419,6 +2419,12 @@ function Home({ user, isGuestMode }) {
                     <Marker
                       key={index}
                       position={{ lat: wp.lat, lng: wp.lon }}
+                      onMouseOver={() => {
+                        setSelectedWaypoint(index);
+                      }}
+                      onMouseOut={() => {
+                        setSelectedWaypoint(null);
+                      }}
                       onClick={() => {
                         setSelectedWaypoint(index);
                       }}
@@ -2593,7 +2599,7 @@ function Home({ user, isGuestMode }) {
         <div className="flex justify-center items-center gap-4 my-4 flex-wrap">
           <div
             style={{
-              width: "128px",
+              width: "96px",
               height: "12px",
               display: "flex",
               flexDirection: "column",

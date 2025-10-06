@@ -1285,11 +1285,28 @@ function Home({ user, isGuestMode }) {
       speedContext: speed,
     };
 
-    setWaypoints((prev) => [...prev, waypoint]);
+    setWaypoints((prev) => {
+      const updated = [...prev, waypoint];
+      console.log(
+        `✅ Voice waypoint added. Total waypoints: ${updated.length}`
+      );
+      console.log(
+        `📍 New waypoint at: ${waypoint.lat.toFixed(6)}, ${waypoint.lon.toFixed(
+          6
+        )}`
+      );
+      return updated;
+    });
 
     setWaypointAdded(true);
     setTimeout(() => setWaypointAdded(false), 2000);
     if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
+
+    // Force map to re-render and show the new waypoint
+    setRefreshKey((prev) => {
+      console.log(`🔄 Refreshing map (key: ${prev} -> ${prev + 1})`);
+      return prev + 1;
+    });
 
     setShowUndo(true);
     setUndoTimeLeft(5);

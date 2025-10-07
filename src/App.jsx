@@ -2474,8 +2474,8 @@ function Home({ user, isGuestMode }) {
                       lng: pt.lon,
                     }))}
                     options={{
-                      strokeColor: "#00FF00",
-                      strokeOpacity: 0.6,
+                      strokeColor: "#FF0000",
+                      strokeOpacity: 0.7,
                       strokeWeight: 2,
                       geodesic: true,
                     }}

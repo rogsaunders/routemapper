@@ -2455,18 +2455,6 @@ function Home({ user, isGuestMode }) {
                   );
                 })}
 
-                {routePath.length > 1 && (
-                  <Polyline
-                    path={routePath}
-                    options={{
-                      strokeColor: "#FF0000",
-                      strokeOpacity: 0.8,
-                      strokeWeight: 4,
-                      geodesic: true,
-                    }}
-                  />
-                )}
-
                 {trackingPoints.length > 1 && (
                   <Polyline
                     path={trackingPoints.map((pt) => ({

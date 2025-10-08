@@ -2610,7 +2610,7 @@ function Home({ user, isGuestMode }) {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: "black",
+              backgroundColor: "Blue",
               color: "white",
               border: "2px solid #1e3a8a",
               borderRadius: "8px",

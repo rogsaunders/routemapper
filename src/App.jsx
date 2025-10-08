@@ -355,8 +355,8 @@ function Home({ user, isGuestMode }) {
 
     const options = {
       enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 60000,
+      timeout: 30000,
+      maximumAge: 0,
     };
 
     geo.getCurrentPosition(handleSuccess, handleError, options);
@@ -582,7 +582,7 @@ function Home({ user, isGuestMode }) {
         setGpsError("Failed to get starting GPS position. Please try again.");
         setstageLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 6000 }
+      { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
     );
   };
 

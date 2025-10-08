@@ -16,7 +16,6 @@ import { dataSync } from "./services/dataSync";
 import Auth from "./components/Auth";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AuthCallback from "./routes/AuthCallback";
-// near the top with your map imports
 
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -2456,18 +2455,17 @@ function Home({ user, isGuestMode }) {
                   );
                 })}
 
-                {routeWaypoints.length > 1 && (
+                {trackingPoints.length > 1 && (
                   <Polyline
-                    path={routeWaypoints.map(({ lat, lon }) => ({
-                      lat,
-                      lng: lon,
+                    path={trackingPoints.map((pt) => ({
+                      lat: pt.lat,
+                      lng: pt.lon,
                     }))}
                     options={{
                       strokeColor: "#FF0000",
-                      strokeOpacity: 0.9,
-                      strokeWeight: 2, // thinner line; set to 1 if you want ultra-thin
+                      strokeOpacity: 0.7,
+                      strokeWeight: 2,
                       geodesic: true,
-                      zIndex: 40, // keep below markers; tweak if needed
                     }}
                   />
                 )}
@@ -2612,9 +2610,9 @@ function Home({ user, isGuestMode }) {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: "black",
+              backgroundColor: "Blue",
               color: "white",
-              //border: "2px solid #1e3a8a",
+              border: "2px solid #1e3a8a",
               borderRadius: "8px",
               fontWeight: "bold",
               boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",

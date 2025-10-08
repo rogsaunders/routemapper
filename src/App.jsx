@@ -422,7 +422,7 @@ function Home({ user, isGuestMode }) {
             console.log("📍 Auto-tracked:", newPoint);
           },
           (err) => console.error("❌ GPS error", err),
-          { enableHighAccuracy: true, timeout: 15000 }
+          { enableHighAccuracy: true, timeout: 30000 }
         );
       }
     }, 20000);
@@ -2455,22 +2455,6 @@ function Home({ user, isGuestMode }) {
                     />
                   );
                 })}
-
-                {routeWaypoints.length > 1 && (
-                  <Polyline
-                    path={routeWaypoints.map(({ lat, lon }) => ({
-                      lat,
-                      lng: lon,
-                    }))}
-                    options={{
-                      strokeColor: "#FF0000",
-                      strokeOpacity: 0.9,
-                      strokeWeight: 2, // thinner line; set to 1 if you want ultra-thin
-                      geodesic: true,
-                      zIndex: 40, // keep below markers; tweak if needed
-                    }}
-                  />
-                )}
 
                 {trackingPoints.length > 1 && (
                   <Polyline

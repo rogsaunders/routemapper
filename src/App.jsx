@@ -2522,7 +2522,7 @@ function Home({ user, isGuestMode }) {
           {isTracking && (
             <div className="flex items-center text-green-600 font-bold">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-ping mr-2"></div>
-              📍 Tracking...
+              📍 Tracking...(Points: {trackingPoints.length})
             </div>
           )}
         </div>

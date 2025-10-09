@@ -392,7 +392,10 @@ function Home({ user, isGuestMode }) {
   useEffect(() => {
     if (!isTracking) return;
 
+    console.log("🔄 Tracking started - will collect points every 20 seconds");
+
     const interval = setInterval(() => {
+      console.log("⏰ 20 second interval fired, current GPS:", currentGPS);
       if (currentGPS?.lat && currentGPS?.lon) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -401,6 +404,8 @@ function Home({ user, isGuestMode }) {
               lon: pos.coords.longitude,
               timestamp: new Date().toISOString(),
             };
+
+            console.log("✅ New tracking point collected:", newPoint);
 
             setTrackingPoints((prev) => {
               if (prev.length > 0) {
@@ -419,15 +424,19 @@ function Home({ user, isGuestMode }) {
             });
 
             setCurrentGPS({ lat: newPoint.lat, lon: newPoint.lon });
-            console.log("📍 Auto-tracked:", newPoint);
           },
-          (err) => console.error("❌ GPS error", err),
+          (err) => console.error("❌ GPS error in tracking:", err),
           { enableHighAccuracy: true, timeout: 30000 }
         );
+      } else {
+        console.log("⚠️ Cannot track - no current GPS");
       }
     }, 20000);
 
-    return () => clearInterval(interval);
+    return () => {
+      console.log("🛑 Tracking stopped");
+      clearInterval(interval);
+    };
   }, [isTracking, currentGPS]);
 
   useEffect(() => {

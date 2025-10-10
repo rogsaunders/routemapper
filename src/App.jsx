@@ -437,7 +437,7 @@ function Home({ user, isGuestMode }) {
       console.log("🛑 Tracking stopped");
       clearInterval(interval);
     };
-  }, [isTracking, currentGPS]);
+  }, [isTracking]);
 
   useEffect(() => {
     if (!showUndo) return;

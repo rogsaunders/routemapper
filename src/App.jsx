@@ -405,7 +405,7 @@ function Home({ user, isGuestMode }) {
               timestamp: new Date().toISOString(),
             };
 
-            console.log("✅ New tracking point collected:", newPoint);
+            // console.log("✅ New tracking point collected:", newPoint);
 
             setTrackingPoints((prev) => {
               if (prev.length > 0) {

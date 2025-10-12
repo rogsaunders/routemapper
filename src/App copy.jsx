@@ -231,80 +231,7 @@ function Home({ user, isGuestMode }) {
     useState(false);
   const [continuousListening, setContinuousListening] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
-  const [showIconSelector, setShowIconSelector] = useState(false);
-  const [selectedIcon, setSelectedIcon] = useState(null);
-  const [quickNote, setQuickNote] = useState("");
-  const [isVoiceNoteActive, setIsVoiceNoteActive] = useState(false);
-  // Rally icon definitions - SVG icons from /icons folder
-  const rallyIcons = [
-    {
-      id: "left",
-      iconPath: "/icons/left.svg",
-      label: "Left Turn",
-      category: "navigation",
-    },
-    {
-      id: "right",
-      iconPath: "/icons/right.svg",
-      label: "Right Turn",
-      category: "navigation",
-    },
-    {
-      id: "keep-left",
-      iconPath: "/icons/keep-left.svg",
-      label: "Keep Left",
-      category: "navigation",
-    },
-    {
-      id: "keep-right",
-      iconPath: "/icons/keep-right.svg",
-      label: "Keep Right",
-      category: "navigation",
-    },
-    {
-      id: "straight",
-      iconPath: "/icons/keep-straight.svg",
-      label: "Keep Straight",
-      category: "navigation",
-    },
-    {
-      id: "grid",
-      iconPath: "/icons/grid.svg",
-      label: "Cattle Grid",
-      category: "obstacle",
-    },
-    {
-      id: "fence",
-      iconPath: "/icons/fence.svg",
-      label: "Fence Gate",
-      category: "obstacle",
-    },
-    {
-      id: "caution",
-      iconPath: "/icons/caution.svg",
-      label: "Caution",
-      category: "safety",
-    },
-    {
-      id: "danger",
-      iconPath: "/icons/danger-1.svg",
-      label: "Danger",
-      category: "safety",
-    },
-    {
-      id: "bump",
-      iconPath: "/icons/bump.svg",
-      label: "Bump",
-      category: "surface",
-    },
-    {
-      id: "dip",
-      iconPath: "/icons/dip-hole.svg",
-      label: "Dip-Hole",
-      category: "surface",
-    },
-    { id: "waypoint", emoji: "📍", label: "Waypoint", category: "general" },
-  ];
+
   const handleSignOut = async () => {
     try {
       if (user !== "guest") {
@@ -580,19 +507,8 @@ function Home({ user, isGuestMode }) {
   };
 
   const handleAddWaypoint = () => {
-    setShowIconSelector(true);
-  };
-
-  const handleIconSelect = (icon) => {
-    setSelectedIcon(icon);
-  };
-
-  const handleConfirmWaypoint = () => {
     if (!currentGPS) {
       setGpsError("No GPS signal available. Please wait for GPS to be ready.");
-      setShowIconSelector(false);
-      setSelectedIcon(null);
-      setQuickNote("");
       return;
     }
 
@@ -610,23 +526,14 @@ function Home({ user, isGuestMode }) {
 
     setTotalDistance(cumulativeDistance);
 
-    // Combine icon label with quick note if provided
-    const waypointName = quickNote.trim()
-      ? `${selectedIcon.label} - ${quickNote.trim()}`
-      : selectedIcon.label;
-
     const waypoint = {
-      name: waypointName,
+      name: "Unnamed",
       lat: currentGPS.lat,
       lon: currentGPS.lon,
       timestamp,
       fullTimestamp,
       distance: cumulativeDistance,
-      poi: quickNote.trim(),
-      iconId: selectedIcon.id,
-      iconPath: selectedIcon.iconPath,
-      iconEmoji: selectedIcon.emoji,
-      category: selectedIcon.category,
+      poi: "",
     };
     setWaypoints((prev) => [...prev, waypoint]);
 
@@ -635,60 +542,10 @@ function Home({ user, isGuestMode }) {
 
     if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
 
-    console.log("✅ Icon waypoint added:", waypoint);
+    console.log("✅ Waypoint added:", waypoint);
 
     setShowUndo(true);
     setUndoTimeLeft(5);
-
-    // Close modal and reset
-    setShowIconSelector(false);
-    setSelectedIcon(null);
-    setQuickNote("");
-  };
-
-  const handleCancelIconSelector = () => {
-    setShowIconSelector(false);
-    setSelectedIcon(null);
-    setQuickNote("");
-    setIsVoiceNoteActive(false);
-  };
-
-  const handleVoiceNote = () => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Speech Recognition is not supported in this browser.");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-AU";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    recognition.continuous = false;
-
-    recognition.onstart = () => {
-      setIsVoiceNoteActive(true);
-      console.log("🎤 Voice note recognition started");
-    };
-
-    recognition.onend = () => {
-      setIsVoiceNoteActive(false);
-      console.log("🎤 Voice note recognition ended");
-    };
-
-    recognition.onresult = (event) => {
-      const spokenText = event.results[0][0].transcript;
-      console.log("🗣️ Voice note received:", spokenText);
-      setQuickNote(spokenText);
-    };
-
-    recognition.onerror = (event) => {
-      console.error("Voice note error:", event.error);
-      setIsVoiceNoteActive(false);
-    };
-
-    recognition.start();
   };
 
   const handleStartstage = () => {
@@ -2125,249 +1982,6 @@ function Home({ user, isGuestMode }) {
     );
   };
 
-  const IconSelectorDialog = () => {
-    if (!showIconSelector) return null;
-
-    return (
-      <div
-        style={{
-          position: "fixed",
-          top: "0",
-          left: "0",
-          right: "0",
-          bottom: "0",
-          backgroundColor: "rgba(0, 0, 0, 0.6)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: "999",
-          padding: "20px",
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: "white",
-            borderRadius: "12px",
-            padding: "24px",
-            width: "100%",
-            maxWidth: "600px",
-            maxHeight: "90vh",
-            overflowY: "auto",
-            boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.3)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "20px",
-            }}
-          >
-            <h3
-              style={{
-                fontSize: "1.25rem",
-                fontWeight: "bold",
-                color: "#1F2937",
-              }}
-            >
-              {selectedIcon ? "Add Note (Optional)" : "Select Waypoint Type"}
-            </h3>
-            <button
-              onClick={handleCancelIconSelector}
-              style={{
-                fontSize: "1.5rem",
-                color: "#6B7280",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: "4px",
-              }}
-            >
-              ✕
-            </button>
-          </div>
-
-          {!selectedIcon ? (
-            // Icon selection grid
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gap: "10px",
-              }}
-            >
-              {rallyIcons.map((icon) => (
-                <button
-                  key={icon.id}
-                  onClick={() => handleIconSelect(icon)}
-                  style={{
-                    padding: "12px",
-                    borderRadius: "8px",
-                    border: "2px solid #E5E7EB",
-                    backgroundColor: "white",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: "6px",
-                    minHeight: "90px",
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.borderColor = "#3B82F6";
-                    e.currentTarget.style.backgroundColor = "#EFF6FF";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.borderColor = "#E5E7EB";
-                    e.currentTarget.style.backgroundColor = "white";
-                  }}
-                >
-                  {icon.iconPath ? (
-                    <img
-                      src={icon.iconPath}
-                      alt={icon.label}
-                      style={{ width: "32px", height: "32px" }}
-                    />
-                  ) : (
-                    <span style={{ fontSize: "1.5rem" }}>{icon.emoji}</span>
-                  )}
-                  <span
-                    style={{
-                      fontSize: "0.75rem",
-                      fontWeight: "500",
-                      textAlign: "center",
-                      lineHeight: "1.2",
-                    }}
-                  >
-                    {icon.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            // Note input after icon selection
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "16px",
-                  backgroundColor: "#F3F4F6",
-                  borderRadius: "8px",
-                  marginBottom: "16px",
-                }}
-              >
-                {selectedIcon.iconPath ? (
-                  <img
-                    src={selectedIcon.iconPath}
-                    alt={selectedIcon.label}
-                    style={{ width: "40px", height: "40px" }}
-                  />
-                ) : (
-                  <span style={{ fontSize: "2rem" }}>{selectedIcon.emoji}</span>
-                )}
-                <span style={{ fontSize: "1rem", fontWeight: "600" }}>
-                  {selectedIcon.label}
-                </span>
-              </div>
-
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.875rem",
-                  fontWeight: "500",
-                  color: "#374151",
-                  marginBottom: "8px",
-                }}
-              >
-                Additional Note (Optional):
-              </label>
-              <div
-                style={{ display: "flex", gap: "8px", marginBottom: "20px" }}
-              >
-                <input
-                  type="text"
-                  value={quickNote}
-                  onChange={(e) => setQuickNote(e.target.value)}
-                  placeholder="e.g., sharp, 50m, after house..."
-                  style={{
-                    flex: "1",
-                    padding: "10px 12px",
-                    border: "2px solid #E5E7EB",
-                    borderRadius: "6px",
-                    fontSize: "1rem",
-                  }}
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter") {
-                      handleConfirmWaypoint();
-                    }
-                  }}
-                />
-                <button
-                  onClick={handleVoiceNote}
-                  disabled={isVoiceNoteActive}
-                  style={{
-                    padding: "10px 16px",
-                    backgroundColor: isVoiceNoteActive ? "#EF4444" : "#3B82F6",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "6px",
-                    cursor: isVoiceNoteActive ? "not-allowed" : "pointer",
-                    fontSize: "1.2rem",
-                    minWidth: "50px",
-                  }}
-                >
-                  {isVoiceNoteActive ? "🔴" : "🎤"}
-                </button>
-              </div>
-
-              <div style={{ display: "flex", gap: "12px" }}>
-                <button
-                  onClick={() => {
-                    setSelectedIcon(null);
-                    setQuickNote("");
-                  }}
-                  style={{
-                    flex: "1",
-                    padding: "12px 16px",
-                    backgroundColor: "#E5E7EB",
-                    color: "#374151",
-                    border: "none",
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                    fontWeight: "500",
-                    fontSize: "1rem",
-                  }}
-                >
-                  ← Back
-                </button>
-                <button
-                  onClick={handleConfirmWaypoint}
-                  disabled={!currentGPS}
-                  style={{
-                    flex: "2",
-                    padding: "12px 16px",
-                    backgroundColor: currentGPS ? "#3B82F6" : "#9CA3AF",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "6px",
-                    cursor: currentGPS ? "pointer" : "not-allowed",
-                    fontWeight: "600",
-                    fontSize: "1rem",
-                  }}
-                >
-                  ✓ Add Waypoint
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   const MapControls = () => (
     <>
       <div
@@ -2500,7 +2114,6 @@ function Home({ user, isGuestMode }) {
       <WaypointSuccessNotification />
       <EndstageConfirmDialog />
       <StartstageConfirmDialog />
-      <IconSelectorDialog />
 
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold text-blue-800 flex items-center gap-2">
@@ -2894,7 +2507,7 @@ function Home({ user, isGuestMode }) {
                 Listening...
               </>
             ) : (
-              <>🎤 Add Location/POI</>
+              <>🎤 Add Location</>
             )}
           </button>
 
@@ -3050,29 +2663,6 @@ function Home({ user, isGuestMode }) {
                             }}
                           >
                             <span className="text-blue-500">🎤</span>
-                          </div>
-                        ) : wp.iconPath ? (
-                          <img
-                            src={wp.iconPath}
-                            alt={wp.name}
-                            style={{
-                              width: "24px",
-                              height: "24px",
-                              marginRight: "8px",
-                            }}
-                          />
-                        ) : wp.iconEmoji ? (
-                          <div
-                            style={{
-                              width: "24px",
-                              height: "24px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              marginRight: "8px",
-                            }}
-                          >
-                            <span>{wp.iconEmoji}</span>
                           </div>
                         ) : (
                           <div

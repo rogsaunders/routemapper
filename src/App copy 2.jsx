@@ -1880,23 +1880,7 @@ function Home({ user, isGuestMode }) {
             </div>
             <button
               onClick={() => window.location.reload()}
-              style={{
-                padding: "4px 8px", // px-4 py-2 (4 = 16px, 2 = 8px)
-                backgroundColor: "#f94d4dff",
-                color: "white", // text-white
-                borderRadius: "4px", // rounded
-                fontSize: "0.875rem", // text-sm
-                //fontWeight: "bold", // if you want bold
-                //border: "2px solid rgba(5, 5, 5, 1)",
-                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                cursor: "pointer",
-              }}
-              onMouseOver={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f80000ff")
-              }
-              onMouseOut={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f94d4dff")
-              }
+              className="ml-2 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
             >
               Retry
             </button>
@@ -2529,66 +2513,34 @@ function Home({ user, isGuestMode }) {
 
       <div className="flex gap-4 mb-2">
         <button
-          style={{
-            padding: "8px 16px", // px-4 py-2 (4 = 16px, 2 = 8px)
-            backgroundColor: "#f94d4dff",
-            color: "white", // text-white
-            borderRadius: "4px", // rounded
-            fontSize: "0.875rem", // text-sm
-            //fontWeight: "bold", // if you want bold
-            //border: "2px solid rgba(5, 5, 5, 1)",
-            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-            cursor: "pointer",
-          }}
-          onMouseOver={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f80000ff")
-          }
-          onMouseOut={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f94d4dff")
-          }
+          className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700 text-sm"
           onClick={() => setShowMap((prev) => !prev)}
         >
           {showMap ? "Hide Map" : "Show Map"}
         </button>
         <button
-          style={{
-            padding: "8px 16px", // px-4 py-2 (4 = 16px, 2 = 8px)
-            backgroundColor: "#f94d4dff",
-            color: "white", // text-white
-            borderRadius: "4px", // rounded
-            fontSize: "0.875rem", // text-sm
-            //fontWeight: "bold", // if you want bold
-            //border: "2px solid rgba(5, 5, 5, 1)",
-            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-            cursor: "pointer",
-          }}
-          onMouseOver={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f80000ff")
-          }
-          onMouseOut={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f94d4dff")
-          }
+          className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700 text-sm"
           onClick={() => setFullScreenMap((prev) => !prev)}
         >
           {fullScreenMap ? "Exit Full Screen" : "Full Screen Map"}
         </button>
+        <button
+          onClick={() => setShowReplay((prev) => !prev)}
+          className="px-4 py-2 bg-brown-600 text-white rounded hover:bg-brown-700 text-sm"
+        >
+          {showReplay ? "Hide" : "Show"} Route Replay
+        </button>
+
+        {showReplay && <ReplayRoute routeWaypoints={routeWaypoints} />}
 
         <button
-          style={{
-            padding: "8px 16px",
-            backgroundColor: "#f94d4dff",
-            color: "white",
-            borderRadius: "4px",
-            fontSize: "0.875rem",
-            cursor: "pointer",
-          }}
-          onMouseOver={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f80000ff")
-          }
-          onMouseOut={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f94d4dff")
-          }
           onClick={recenterOnGPS}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg ${
+            isFollowingGPS
+              ? "bg-brown-600 text-white hover:bg-blue-700"
+              : "bg-green-600 text-white hover:bg-green-700"
+          }`}
+          title={isFollowingGPS ? "Following GPS" : "Click to re-center on GPS"}
         >
           📍 {isFollowingGPS ? "Following GPS" : "Re-center"}
         </button>
@@ -2762,20 +2714,7 @@ function Home({ user, isGuestMode }) {
                 Day {currentDay}
               </span>
               <button
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "#f94d4dff",
-                  color: "white",
-                  borderRadius: "4px",
-                  fontSize: "0.875rem",
-                  cursor: "pointer",
-                }}
-                onMouseOver={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#f80000ff")
-                }
-                onMouseOut={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#f94d4dff")
-                }
+                className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700"
                 onClick={handleNewDay}
                 title="Start new day"
               >
@@ -2786,20 +2725,7 @@ function Home({ user, isGuestMode }) {
 
           <div className="flex flex-col justify-end">
             <button
-              style={{
-                padding: "8px 16px",
-                backgroundColor: "#f94d4dff",
-                color: "white",
-                borderRadius: "4px",
-                fontSize: "0.875rem",
-                cursor: "pointer",
-              }}
-              onMouseOver={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f80000ff")
-              }
-              onMouseOut={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f94d4dff")
-              }
+              className="bg-brown-600 text-white px-3 py-2 rounded hover:bg-green-700 text-sm"
               onClick={handleNewRoute}
               title="Start new route"
             >
@@ -2905,7 +2831,7 @@ function Home({ user, isGuestMode }) {
               gap: "8px",
               backgroundColor:
                 !currentGPS || !stageStarted
-                  ? "#f94d4dff"
+                  ? "#e98547"
                   : waypointAdded
                   ? "#059669"
                   : "#16a34a",
@@ -2925,7 +2851,7 @@ function Home({ user, isGuestMode }) {
                 padding: "10px 10px",
                 borderRadius: "8px",
                 fontSize: "1rem",
-                backgroundColor: "#f94d4dff",
+                backgroundColor: "#EF4444",
                 color: "white",
                 //border: "2px solid #1e3a8a",
                 cursor: "pointer",
@@ -2952,7 +2878,7 @@ function Home({ user, isGuestMode }) {
               alignItems: "center",
               gap: "12px",
               backgroundColor: !stageStarted
-                ? "#f94d4dff"
+                ? "#e98547"
                 : recognitionActive
                 ? "#EF4444"
                 : "#16a34a",
@@ -2977,7 +2903,7 @@ function Home({ user, isGuestMode }) {
               padding: "10px 10px",
               borderRadius: "8px",
               fontSize: "1.0rem",
-              backgroundColor: !stageStarted ? "#f94d4dff" : "#D1D5DB",
+              backgroundColor: !stageStarted ? "#e98547" : "#D1D5DB",
               color: "white",
               //border: "2px solid #1e3a8a",
               cursor: !stageStarted ? "not-allowed" : "pointer",

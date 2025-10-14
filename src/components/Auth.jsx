@@ -128,7 +128,7 @@ export default function Auth({ onAuthSuccess, onGuest }) {
 
   const primaryButtonStyle = {
     ...buttonStyle,
-    backgroundColor: loading ? "#60a5fa" : "#2563eb",
+    backgroundColor: loading ? "rgba(88 130 52 / 1)" : "rgba(88 130 52 / 0.7)",
     color: "white",
     cursor: loading ? "not-allowed" : "pointer",
   };
@@ -307,7 +307,7 @@ export default function Auth({ onAuthSuccess, onGuest }) {
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#1d4ed8",
+                  color: "rgba(88 130 52 / 0.7)",
                   cursor: "pointer",
                   textDecoration: "underline",
                 }}

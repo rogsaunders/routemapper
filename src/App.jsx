@@ -2326,7 +2326,9 @@ function Home({ user, isGuestMode }) {
                   disabled={isVoiceNoteActive}
                   style={{
                     padding: "10px 16px",
-                    backgroundColor: isVoiceNoteActive ? "#EF4444" : "#3B82F6",
+                    backgroundColor: isVoiceNoteActive
+                      ? "#EF4444"
+                      : "rgba(88 130 52 / 1)",
                     color: "white",
                     border: "none",
                     borderRadius: "6px",
@@ -2365,7 +2367,9 @@ function Home({ user, isGuestMode }) {
                   style={{
                     flex: "2",
                     padding: "12px 16px",
-                    backgroundColor: currentGPS ? "#3B82F6" : "#9CA3AF",
+                    backgroundColor: currentGPS
+                      ? "rgba(88 130 52 / 1.0)"
+                      : "#9CA3AF",
                     color: "white",
                     border: "none",
                     borderRadius: "6px",

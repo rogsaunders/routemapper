@@ -2531,7 +2531,7 @@ function Home({ user, isGuestMode }) {
         <button
           style={{
             padding: "8px 16px", // px-4 py-2 (4 = 16px, 2 = 8px)
-            backgroundColor: "#f94d4dff",
+            backgroundColor: "rgba(88 130 52 / 0.7)",
             color: "white", // text-white
             borderRadius: "4px", // rounded
             fontSize: "0.875rem", // text-sm
@@ -2541,10 +2541,10 @@ function Home({ user, isGuestMode }) {
             cursor: "pointer",
           }}
           onMouseOver={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f80000ff")
+            (e.currentTarget.style.backgroundColor = "rgba(88 130 52 / 1)")
           }
           onMouseOut={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f94d4dff")
+            (e.currentTarget.style.backgroundColor = "rgba(88 130 52 / 0.7)")
           }
           onClick={() => setShowMap((prev) => !prev)}
         >
@@ -2553,7 +2553,7 @@ function Home({ user, isGuestMode }) {
         <button
           style={{
             padding: "8px 16px", // px-4 py-2 (4 = 16px, 2 = 8px)
-            backgroundColor: "#f94d4dff",
+            backgroundColor: "rgba(88 130 52 / 0.7)",
             color: "white", // text-white
             borderRadius: "4px", // rounded
             fontSize: "0.875rem", // text-sm
@@ -2563,10 +2563,10 @@ function Home({ user, isGuestMode }) {
             cursor: "pointer",
           }}
           onMouseOver={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f80000ff")
+            (e.currentTarget.style.backgroundColor = "rgba(88 130 52 / 1)")
           }
           onMouseOut={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f94d4dff")
+            (e.currentTarget.style.backgroundColor = "rgba(88 130 52 / 0.7)")
           }
           onClick={() => setFullScreenMap((prev) => !prev)}
         >
@@ -2576,17 +2576,17 @@ function Home({ user, isGuestMode }) {
         <button
           style={{
             padding: "8px 16px",
-            backgroundColor: "#f94d4dff",
+            backgroundColor: "rgba(88 130 52 / 0.7)",
             color: "white",
             borderRadius: "4px",
             fontSize: "0.875rem",
             cursor: "pointer",
           }}
           onMouseOver={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f80000ff")
+            (e.currentTarget.style.backgroundColor = "rgba(88 130 52 / 1)")
           }
           onMouseOut={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f94d4dff")
+            (e.currentTarget.style.backgroundColor = "rgba(88 130 52 / 0.7)")
           }
           onClick={recenterOnGPS}
         >
@@ -2764,17 +2764,19 @@ function Home({ user, isGuestMode }) {
               <button
                 style={{
                   padding: "8px 16px",
-                  backgroundColor: "#f94d4dff",
+                  backgroundColor: "rgba(88 130 52 / 0.7)",
                   color: "white",
                   borderRadius: "4px",
                   fontSize: "0.875rem",
                   cursor: "pointer",
                 }}
                 onMouseOver={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#f80000ff")
+                  (e.currentTarget.style.backgroundColor =
+                    "rgba(88 130 52 / 1)")
                 }
                 onMouseOut={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#f94d4dff")
+                  (e.currentTarget.style.backgroundColor =
+                    "rgba(88 130 52 / 0.7)")
                 }
                 onClick={handleNewDay}
                 title="Start new day"
@@ -2788,17 +2790,18 @@ function Home({ user, isGuestMode }) {
             <button
               style={{
                 padding: "8px 16px",
-                backgroundColor: "#f94d4dff",
+                backgroundColor: "rgba(88 130 52 / 0.7)",
                 color: "white",
                 borderRadius: "4px",
                 fontSize: "0.875rem",
                 cursor: "pointer",
               }}
               onMouseOver={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f80000ff")
+                (e.currentTarget.style.backgroundColor = "rgba(88 130 52 / 1)")
               }
               onMouseOut={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f94d4dff")
+                (e.currentTarget.style.backgroundColor =
+                  "rgba(88 130 52 / 0.7)")
               }
               onClick={handleNewRoute}
               title="Start new route"
@@ -2825,10 +2828,33 @@ function Home({ user, isGuestMode }) {
             />
           </div>
 
-          <div className="flex flex-col justify-end">
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "flex-end",
+            }}
+          >
             {!stageStarted ? (
               <button
-                className="bg-green-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+                style={{
+                  backgroundColor:
+                    stageLoading || !currentGPS
+                      ? "#9CA3AF"
+                      : "rgba(88 130 52 / 0.7)",
+                  color: "white",
+                  padding: "8px 16px",
+                  borderRadius: "4px",
+                  fontSize: "0.875rem",
+                  cursor:
+                    stageLoading || !currentGPS ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  border: "none",
+                  fontWeight: "500",
+                  opacity: stageLoading || !currentGPS ? 0.6 : 1,
+                }}
                 onClick={() => {
                   if (routeWaypoints.length > 0) {
                     setShowStartstageConfirm(true);
@@ -2840,7 +2866,16 @@ function Home({ user, isGuestMode }) {
               >
                 {stageLoading ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <div
+                      style={{
+                        width: "16px",
+                        height: "16px",
+                        border: "2px solid white",
+                        borderBottomColor: "transparent",
+                        borderRadius: "50%",
+                        animation: "spin 1s linear infinite",
+                      }}
+                    ></div>
                     Starting...
                   </>
                 ) : (
@@ -2849,7 +2884,21 @@ function Home({ user, isGuestMode }) {
               </button>
             ) : (
               <button
-                className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-red-600 disabled:cursor-not-allowed text-sm"
+                style={{
+                  backgroundColor:
+                    routeWaypoints.length === 0
+                      ? "rgba(245 93 0 / 0.7)"
+                      : "rgba(245 93 0 / 0.7)",
+                  color: "white",
+                  padding: "8px 16px",
+                  borderRadius: "4px",
+                  fontSize: "0.875rem",
+                  cursor:
+                    routeWaypoints.length === 0 ? "not-allowed" : "pointer",
+                  border: "none",
+                  fontWeight: "500",
+                  opacity: routeWaypoints.length === 0 ? 0.6 : 1,
+                }}
                 onClick={() => setShowEndstageConfirm(true)}
                 disabled={routeWaypoints.length === 0}
               >
@@ -2876,7 +2925,7 @@ function Home({ user, isGuestMode }) {
               borderRadius: "8px",
               fontWeight: "bold",
               boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-              padding: "16px",
+              padding: "14px",
             }}
           >
             <span
@@ -2905,10 +2954,10 @@ function Home({ user, isGuestMode }) {
               gap: "8px",
               backgroundColor:
                 !currentGPS || !stageStarted
-                  ? "#f94d4dff"
+                  ? "rgba(245 93 0 / 0.7)"
                   : waypointAdded
-                  ? "#059669"
-                  : "#16a34a",
+                  ? "rgba(245 93 0 / 1)"
+                  : "rgba(245 93 0 / 0.7)",
               color: "white",
               cursor: !currentGPS || !stageStarted ? "not-allowed" : "pointer",
               //border: "2px solid #1e3a8a",
@@ -2925,7 +2974,7 @@ function Home({ user, isGuestMode }) {
                 padding: "10px 10px",
                 borderRadius: "8px",
                 fontSize: "1rem",
-                backgroundColor: "#f94d4dff",
+                backgroundColor: "rgba(245 93 0 / 0.7)",
                 color: "white",
                 //border: "2px solid #1e3a8a",
                 cursor: "pointer",
@@ -2952,10 +3001,10 @@ function Home({ user, isGuestMode }) {
               alignItems: "center",
               gap: "12px",
               backgroundColor: !stageStarted
-                ? "#f94d4dff"
+                ? "rgba(245 93 0 / 0.7)"
                 : recognitionActive
-                ? "#EF4444"
-                : "#16a34a",
+                ? "rgba(245 93 0 / 0.7)"
+                : "rgba(245 93 0 / 0.7)",
               color: "white",
               cursor: !stageStarted ? "not-allowed" : "pointer",
               //border: "2px solid #1e3a8a",
@@ -2977,7 +3026,9 @@ function Home({ user, isGuestMode }) {
               padding: "10px 10px",
               borderRadius: "8px",
               fontSize: "1.0rem",
-              backgroundColor: !stageStarted ? "#f94d4dff" : "#D1D5DB",
+              backgroundColor: !stageStarted
+                ? "rgba(245 93 0 / 0.7)"
+                : "#D1D5DB",
               color: "white",
               //border: "2px solid #1e3a8a",
               cursor: !stageStarted ? "not-allowed" : "pointer",

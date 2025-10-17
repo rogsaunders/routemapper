@@ -268,28 +268,28 @@ function Home({ user, isGuestMode }) {
       category: "navigation",
     },
     {
-      id: "grid",
-      iconPath: "/icons/grid.svg",
-      label: "Cattle Grid",
-      category: "obstacle",
-    },
-    {
-      id: "fence",
-      iconPath: "/icons/fence.svg",
-      label: "Fence Gate",
-      category: "obstacle",
-    },
-    {
       id: "caution",
       iconPath: "/icons/caution.svg",
       label: "Caution",
       category: "safety",
     },
     {
-      id: "danger",
-      iconPath: "/icons/danger-1.svg",
-      label: "Danger",
-      category: "safety",
+      id: "grid",
+      iconPath: "/icons/grid.svg",
+      label: "Grid",
+      category: "obstacle",
+    },
+    {
+      id: "gate",
+      iconPath: "/icons/fence-gate.svg",
+      label: "Fence Gate",
+      category: "obstacle",
+    },
+    {
+      id: "fence",
+      iconPath: "/icons/sandy_wadi.svg",
+      label: "Floodway",
+      category: "obstacle",
     },
     {
       id: "bump",
@@ -298,10 +298,28 @@ function Home({ user, isGuestMode }) {
       category: "surface",
     },
     {
+      id: "bumpy",
+      iconPath: "/icons/bumpy.svg",
+      label: "Bumpy",
+      category: "surface",
+    },
+    {
       id: "dip",
       iconPath: "/icons/dip-hole.svg",
       label: "Dip-Hole",
       category: "surface",
+    },
+    {
+      id: "danger",
+      iconPath: "/icons/danger-1.svg",
+      label: "Danger",
+      category: "safety",
+    },
+    {
+      id: "stop",
+      iconPath: "/icons/stop.svg",
+      label: "Stop",
+      category: "safety",
     },
     { id: "waypoint", emoji: "📍", label: "Waypoint", category: "general" },
   ];

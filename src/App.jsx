@@ -61,7 +61,7 @@ const exportFileIPadCompatible = async (
   content,
   filename,
   mimeType,
-  title = "Rally Mapper Export"
+  title = "Route Mapper Export"
 ) => {
   try {
     console.log(`🔍 === STARTING EXPORT: ${filename} ===`);
@@ -336,6 +336,21 @@ function Home({ user, isGuestMode }) {
       console.error("Sign out error:", error);
     }
   };
+
+  useEffect(() => {
+    // Prevent re-running
+    if (localStorage.getItem("routemapper-migrated")) return;
+
+    const keys = Object.keys(localStorage);
+    keys.forEach((k) => {
+      if (k.startsWith("rallymapper")) {
+        const newKey = k.replace("rallymapper", "routemapper");
+        localStorage.setItem(newKey, localStorage.getItem(k));
+      }
+    });
+
+    localStorage.setItem("routemapper-migrated", "true");
+  }, []);
 
   // Add this useEffect to set initial sync status
   useEffect(() => {
@@ -1403,7 +1418,7 @@ function Home({ user, isGuestMode }) {
           routeName: routeName || name,
           stageName: stageName,
           exportDate: new Date().toISOString(),
-          appVersion: "RallyMapper-Voice-v2.0",
+          appVersion: "RouteMapper-Voice-v2.0",
           totalWaypoints: waypointsData.length,
           voiceWaypoints: voiceWaypoints,
           manualWaypoints: waypointsData.length - voiceWaypoints,
@@ -1459,7 +1474,7 @@ function Home({ user, isGuestMode }) {
         content,
         `${name}-enhanced.json`,
         "application/json",
-        "Rally Mapper Enhanced JSON"
+        "Route Mapper Enhanced JSON"
       );
 
       console.log("Enhanced JSON export result:", result);
@@ -1508,7 +1523,7 @@ function Home({ user, isGuestMode }) {
         content,
         `${name}-simple.json`,
         "application/json",
-        "Rally Mapper Simple JSON"
+        "Route Mapper Simple JSON"
       );
 
       console.log("Simple JSON export result:", result);
@@ -1534,7 +1549,7 @@ function Home({ user, isGuestMode }) {
         gpxContent,
         `${name}.gpx`,
         "application/gpx+xml",
-        "Rally Mapper GPX Export"
+        "Route Mapper GPX Export"
       );
 
       console.log("GPX export result:", result);
@@ -1556,7 +1571,7 @@ function Home({ user, isGuestMode }) {
       );
 
       const rallyGPX = `<?xml version="1.0" encoding="UTF-8"?>
-    <gpx version="1.1" creator="RallyMapper-Voice" xmlns="http://www.topografix.com/GPX/1/1">
+    <gpx version="1.1" creator="RouteMapper-Voice" xmlns="http://www.topografix.com/GPX/1/1">
       <metadata>
         <n>${name}</n>
         <desc>Rally route with voice instructions - ${
@@ -1621,7 +1636,7 @@ function Home({ user, isGuestMode }) {
         rallyGPX,
         `${name}.gpx`,
         "application/gpx+xml",
-        "Rally Mapper GPX Export"
+        "Route Mapper GPX Export"
       );
 
       console.log("Rally Navigator GPX export result:", result);
@@ -1645,7 +1660,7 @@ function Home({ user, isGuestMode }) {
         kmlContent,
         `${name}.kml`,
         "application/vnd.google-earth.kml+xml",
-        "Rally Mapper KML Export"
+        "Route Mapper KML Export"
       );
 
       console.log("KML export result:", result);
@@ -1831,7 +1846,7 @@ function Home({ user, isGuestMode }) {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Loading Rally Mapper...</p>
+          <p className="text-lg text-gray-600">Loading Route Mapper...</p>
         </div>
       </div>
     );
@@ -2543,7 +2558,7 @@ function Home({ user, isGuestMode }) {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold text-blue-800 flex items-center gap-2">
           <img src="/RRM Logo 64x64.png" className="w-8 h-8" alt="RRM Logo" />
-          Rally Mapper
+          Route Mapper
         </h1>
       </div>
 
@@ -2909,8 +2924,8 @@ function Home({ user, isGuestMode }) {
                 style={{
                   backgroundColor:
                     routeWaypoints.length === 0
-                      ? "rgba(245 93 0 / 0.7)"
-                      : "rgba(245 93 0 / 0.7)",
+                      ? "rgba(220 70 1/ 0.7)"
+                      : "rgba(220 70 1/ 0.7)",
                   color: "white",
                   padding: "8px 16px",
                   borderRadius: "4px",
@@ -2976,10 +2991,10 @@ function Home({ user, isGuestMode }) {
               gap: "8px",
               backgroundColor:
                 !currentGPS || !stageStarted
-                  ? "rgba(245 93 0 / 0.7)"
+                  ? "rgba(220 69 1 / 0.7)"
                   : waypointAdded
-                  ? "rgba(245 93 0 / 1)"
-                  : "rgba(245 93 0 / 0.7)",
+                  ? "rgba(220 70 1/ 1)"
+                  : "rgba(220 70 1/ 0.7)",
               color: "white",
               cursor: !currentGPS || !stageStarted ? "not-allowed" : "pointer",
               //border: "2px solid #1e3a8a",
@@ -2996,7 +3011,7 @@ function Home({ user, isGuestMode }) {
                 padding: "10px 10px",
                 borderRadius: "8px",
                 fontSize: "1rem",
-                backgroundColor: "rgba(245 93 0 / 0.7)",
+                backgroundColor: "rgba(220 70 1/ 0.7)",
                 color: "white",
                 //border: "2px solid #1e3a8a",
                 cursor: "pointer",
@@ -3023,10 +3038,10 @@ function Home({ user, isGuestMode }) {
               alignItems: "center",
               gap: "12px",
               backgroundColor: !stageStarted
-                ? "rgba(245 93 0 / 0.7)"
+                ? "rgba(220 70 1/ 0.7)"
                 : recognitionActive
-                ? "rgba(245 93 0 / 0.7)"
-                : "rgba(245 93 0 / 0.7)",
+                ? "rgba(220 70 1/ 0.7)"
+                : "rgba(220 70 1/ 0.7)",
               color: "white",
               cursor: !stageStarted ? "not-allowed" : "pointer",
               //border: "2px solid #1e3a8a",
@@ -3049,7 +3064,7 @@ function Home({ user, isGuestMode }) {
               borderRadius: "8px",
               fontSize: "1.0rem",
               backgroundColor: !stageStarted
-                ? "rgba(245 93 0 / 0.7)"
+                ? "rgba(220 70 1/ 0.7)"
                 : "#D1D5DB",
               color: "white",
               //border: "2px solid #1e3a8a",
@@ -3641,14 +3656,14 @@ function mapCategoryToStandardIcon(category, description) {
 
 function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
   const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="RallyMapper-Voice-v2.0" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+<gpx version="1.1" creator="RouteMapper-Voice-v2.0" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
   <metadata>
     <name>${name}</name>
-    <desc>Rally route created with RallyMapper Voice Navigation - ${
+    <desc>Rally route created with RouteMapper Voice Navigation - ${
       waypoints.length
     } waypoints</desc>
     <author>
-      <name>RallyMapper Voice</name>
+      <name>RouteMapper Voice</name>
     </author>
     <time>${new Date().toISOString()}</time>
     <keywords>rally,navigation,voice,waypoints,instructions</keywords>

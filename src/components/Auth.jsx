@@ -163,8 +163,8 @@ export default function Auth({ onAuthSuccess, onGuest }) {
           {isReset
             ? "Enter your email and we'll send you a reset link."
             : isSignUp
-            ? "Create your Rally Mapper account."
-            : "Sign in to continue to Rally Mapper."}
+            ? "Create your Route Mapper account."
+            : "Sign in to continue to Route Mapper."}
         </p>
 
         {message && (

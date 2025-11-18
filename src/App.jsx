@@ -3873,6 +3873,29 @@ function App() {
   const [authLoading, setAuthLoading] = React.useState(true);
   const [guest, setGuest] = React.useState(false);
 
+  // 🔁 One-time LocalStorage migration: RallyMapper → RouteMapper
+  React.useEffect(() => {
+    const FLAG = "routemapper-migrated";
+    if (localStorage.getItem(FLAG)) return;
+
+    const migrations = [
+      ["rally_mapper_backup", "route_mapper_backup"],
+      ["rallymapper-auth", "routemapper-auth"],
+    ];
+
+    migrations.forEach(([oldKey, newKey]) => {
+      if (localStorage.getItem(oldKey) !== null) {
+        const value = localStorage.getItem(oldKey);
+        localStorage.setItem(newKey, value);
+        // Optional: once you're confident, you can also remove the old key:
+        // localStorage.removeItem(oldKey);
+      }
+    });
+
+    localStorage.setItem(FLAG, "true");
+  }, []);
+
+  // 🔐 Existing auth/session effect (leave as-is)
   React.useEffect(() => {
     let sub;
     (async () => {

@@ -15,8 +15,8 @@ import { supabase } from "./lib/supabase";
 import { dataSync } from "./services/dataSync";
 import Auth from "./components/Auth";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { RallyProvider } from "./context/RallyContext";
 import AuthCallback from "./routes/AuthCallback";
-// near the top with your map imports
 
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {

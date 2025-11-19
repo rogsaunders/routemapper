@@ -91,7 +91,7 @@ a {
 
 /* Ensure hero text clears the overlay a bit */
 .hero-content {
-  padding-top: 140px; /* adjust if needed so text doesn't sit under the logo */
+  padding-top: 120px; /* adjust if needed so text doesn't sit under the logo */
 }
 .hero-content p {
   color: #fff;
@@ -101,7 +101,7 @@ a {
 /* Scale down on smaller screens */
 @media (max-width: 900px) {
   .floating-logo img {
-    height: 72px;
+    height: 92px;
   }
   .nav .nav-wrap {
     padding-left: 100px;
@@ -117,7 +117,7 @@ a {
   top: 0;
   left: 0;
   width: 100%;
-  padding: 12px 0; /* ensures even top/bottom spacing */
+  padding: 6px 0; /* ensures even top/bottom spacing */
   border-bottom: none;
   z-index: 1000;
 }
@@ -143,7 +143,7 @@ a {
   text-decoration: underline;
 }
 .brand img {
-  height: 84px;
+  height: 92px;
 }
 .nav a {
   color: var(--slate) !important;

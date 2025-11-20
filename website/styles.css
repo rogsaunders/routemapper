@@ -91,7 +91,7 @@ a {
 
 /* Ensure hero text clears the overlay a bit */
 .hero-content {
-  padding-top: 120px; /* adjust if needed so text doesn't sit under the logo */
+  padding-top: 10px; /* adjust if needed so text doesn't sit under the logo */
 }
 .hero-content p {
   color: #fff;
@@ -117,7 +117,7 @@ a {
   top: 0;
   left: 0;
   width: 100%;
-  padding: 6px 0; /* ensures even top/bottom spacing */
+  padding: 12px 0; /* ensures even top/bottom spacing */
   border-bottom: none;
   z-index: 1000;
 }
@@ -157,7 +157,7 @@ a {
 }
 .btn-green {
   background: var(--green);
-  color: #041c0e;
+  color: #feffff;
 }
 .btn-amber {
   background: var(--amber);

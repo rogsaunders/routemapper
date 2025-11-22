@@ -251,7 +251,7 @@ h1 {
 .hero-image {
   position: relative;
   height: 70vh;
-  background: url("assets/hero.jpg") center center / cover no-repeat;
+  background: url("assets/hero05.png") center center / cover no-repeat;
   display: flex;
   align-items: center;
   justify-content: flex-start;

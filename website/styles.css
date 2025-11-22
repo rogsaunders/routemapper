@@ -148,6 +148,9 @@ a {
 .nav a {
   color: var(--slate) !important;
 }
+.nav .btn-green {
+  color: #ffffff !important;  /* force white text */
+}
 .btn {
   display: inline-block;
   padding: 12px 18px;
@@ -157,7 +160,10 @@ a {
 }
 .btn-green {
   background: var(--green);
-  color: #feffff;
+  color: #ffffff !important;
+}
+.nav .btn-green {
+  color: #ffffff !important;  /* force white text */
 }
 .btn-amber {
   background: var(--amber);
@@ -251,7 +257,7 @@ h1 {
 .hero-image {
   position: relative;
   height: 70vh;
-  background: url("assets/hero05.png") center center / cover no-repeat;
+  background: url("assets/hero.png") center center / cover no-repeat;
   display: flex;
   align-items: center;
   justify-content: flex-start;

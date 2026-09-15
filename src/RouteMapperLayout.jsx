@@ -24,6 +24,7 @@ import {
 } from "./lib/planLimits";
 import { STRIPE_PRICES } from "./lib/stripePrices";
 import { redirectToCheckout, redirectToPortal } from "./lib/checkout";
+import { track } from "./lib/analytics";
 import { upsertStageExport, flushPendingQueue } from "./lib/stageSync";
 import { readPendingQueue, enqueueStage } from "./lib/pendingQueue";
 import { stageFilenameBase } from "./lib/stageNaming";
@@ -577,6 +578,9 @@ export default function RouteMapperLayout() {
     window.history.replaceState({}, "", clean);
 
     if (billing === "success") {
+      // Funnel end: Stripe returned success. Covers both subscriptions and the
+      // one-off Event Pass (distinguished by plan).
+      track("purchase_completed", { plan: planParam || null });
       // Event Pass grants access on ACTIVATION, not purchase — so it must NOT
       // claim the plan was upgraded; it just tells the user to go activate it.
       setBillingToast(planParam === "event_pass" ? "success_pass" : "success");
@@ -793,6 +797,22 @@ export default function RouteMapperLayout() {
     return v === null ? true : v === "true";
   });
   const [upgradePrompt, setUpgradePrompt] = useState(null); // null | reason string
+
+  // Funnel: the upgrade panel just opened. It renders the plan prices, so every
+  // open is a "pricing_viewed"; when it opened because a free user hit a wall we
+  // also record the specific "free_limit_hit". One effect covers every caller
+  // (stage_limit, waypoint_limit, and the proactive "browse" entry points).
+  useEffect(() => {
+    if (!upgradePrompt) return;
+    const reason =
+      upgradePrompt === UPGRADE_REASONS.stage_limit
+        ? "stage_limit"
+        : upgradePrompt === UPGRADE_REASONS.waypoint_limit
+          ? "waypoint_limit"
+          : "browse";
+    track("pricing_viewed", { reason });
+    if (reason !== "browse") track("free_limit_hit", { limit: reason });
+  }, [upgradePrompt]);
   const [billingToast, setBillingToast] = useState(null); // null | 'success' | 'cancelled'
 
   // Trip meta

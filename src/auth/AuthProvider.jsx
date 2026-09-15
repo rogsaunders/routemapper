@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { fetchProfile } from "../lib/profile";
+import { identify, resetAnalytics } from "../lib/analytics";
 
 const AuthCtx = createContext(null);
 const GUEST_KEY = "rm_guest_mode";
@@ -29,6 +30,18 @@ export function AuthProvider({ children }) {
     }
     fetchProfile(userId).then(setProfile);
   }, [session?.user?.id]);
+
+  // Analytics identity: link funnel events to the user by their Supabase UUID
+  // only (no PII), with plan as a person-property so drop-off can be sliced by
+  // tier. Reset on sign-out so the next user on a shared device starts fresh.
+  useEffect(() => {
+    const userId = session?.user?.id ?? null;
+    if (userId) {
+      identify(userId, { plan: profile?.plan ?? "free" });
+    } else {
+      resetAnalytics();
+    }
+  }, [session?.user?.id, profile?.plan]);
 
   useEffect(() => {
     let mounted = true;

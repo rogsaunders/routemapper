@@ -4,6 +4,8 @@
 // Calls the Netlify Function which creates the session server-side
 // (keeping the Stripe secret key out of the browser).
 
+import { track } from "./analytics";
+
 /**
  * Redirect the current user to Stripe Checkout for the given price.
  *
@@ -15,6 +17,10 @@
 export async function redirectToCheckout(priceId, planType, session) {
   const token = session?.access_token;
   if (!token) throw new Error("You must be signed in to upgrade.");
+
+  // Funnel: user is initiating payment. This is the single chokepoint for all
+  // plan/pass checkouts, so one event here captures every checkout start.
+  track("checkout_started", { plan: planType });
 
   // Open the Stripe tab synchronously inside the click gesture, then point it
   // at the session URL once it's created. Opening it here (not after the async

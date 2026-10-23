@@ -13,6 +13,7 @@
     />
 
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="mobile-menu.css" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
@@ -76,7 +77,7 @@
       /* HERO */
       .lp-hero {
         text-align: center;
-        padding: 40px 0 20px;
+        padding: 130px 0 20px; /* clears the shared overlay header */
       }
       .lp-eyebrow {
         display: inline-block;
@@ -370,11 +371,7 @@
   </head>
 
   <body>
-    <div class="lp-topbar">
-      <a href="https://routemapper.net" aria-label="RouteMapper home">
-        <img src="assets/route-logo.png" alt="RouteMapper" />
-      </a>
-    </div>
+    <script src="/site-chrome.js" data-part="header" data-active="live"></script>
 
     <!-- HERO -->
     <header class="lp-hero">
@@ -396,7 +393,7 @@
 
         <div class="lp-video">
           <video
-            src="assets/RouteMapper-Intro-v4-720.mp4"
+            src="assets/Introduction%20to%20Route%20Mapper%202026-2.mp4"
             poster="assets/video-poster.jpg"
             playsinline
             controls
@@ -544,19 +541,12 @@
           >Try it free →</a
         >
         <span class="lp-plans-link"
-          >Ready to go further? <a href="https://routemapper.net/#pricing">See all plans</a></span
+          >Ready to go further? <a href="/#pricing">See all plans</a></span
         >
       </div>
     </section>
 
-    <footer class="lp-foot">
-      <img src="assets/route-logo.png" alt="RouteMapper" />
-      <p>
-        <a href="https://routemapper.net">Home</a> ·
-        <a href="/guide">User Guide</a> ·
-        <a href="https://routemapper.net/#pricing">Pricing</a>
-      </p>
-      <p>&copy; 2026 RouteMapper. Built for the journey.</p>
-    </footer>
+    <script src="/site-chrome.js" data-part="footer"></script>
+    <script src="/mobile-menu.js"></script>
   </body>
 </html>

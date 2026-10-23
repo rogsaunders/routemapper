@@ -8,7 +8,10 @@
  *   <script src="/site-chrome.js" data-part="header"></script>   (where the header goes)
  *   <script src="/site-chrome.js" data-part="footer"></script>   (where the footer goes)
  *
- * Optional on the header tag:  data-active="live"  (highlights that menu item)
+ * Optional on the header tag:
+ *   data-active="live"   highlights that menu item
+ *   data-theme="dark"    light menu text, for pages with a plain dark background
+ *                        (leave off for pages whose header sits over a light photo)
  */
 (function () {
   "use strict";
@@ -41,6 +44,7 @@
   if (!script) return;
   var part = script.getAttribute("data-part");
   var active = script.getAttribute("data-active") || "";
+  var theme = script.getAttribute("data-theme") || "";
 
   function headerHtml() {
     var links = NAV_LINKS.map(function (l) {
@@ -90,6 +94,14 @@
     );
   }
 
-  if (part === "header") script.insertAdjacentHTML("afterend", headerHtml());
+  function darkCss() {
+    return (
+      "<style>.nav .nav-menu a:not(.btn){color:#e8eef6}" +
+      '.nav .nav-menu a:not(.btn):hover,.nav .nav-menu a[aria-current="page"]{color:#fff}</style>'
+    );
+  }
+
+  if (part === "header")
+    script.insertAdjacentHTML("afterend", (theme === "dark" ? darkCss() : "") + headerHtml());
   else if (part === "footer") script.insertAdjacentHTML("afterend", footerHtml());
 })();

@@ -24,6 +24,7 @@ import {
 } from "./lib/planLimits";
 import { STRIPE_PRICES } from "./lib/stripePrices";
 import { redirectToCheckout, redirectToPortal } from "./lib/checkout";
+import { track } from "./lib/analytics";
 import { upsertStageExport, flushPendingQueue } from "./lib/stageSync";
 import { readPendingQueue, enqueueStage } from "./lib/pendingQueue";
 import { stageFilenameBase } from "./lib/stageNaming";
@@ -567,6 +568,8 @@ export default function RouteMapperLayout() {
     const billing = params.get("billing");
     if (!billing) return;
 
+    const planParam = params.get("plan");
+
     // Remove the param from the URL without a page reload
     params.delete("billing");
     params.delete("plan");
@@ -575,7 +578,12 @@ export default function RouteMapperLayout() {
     window.history.replaceState({}, "", clean);
 
     if (billing === "success") {
-      setBillingToast("success");
+      // Funnel end: Stripe returned success. Covers both subscriptions and the
+      // one-off Event Pass (distinguished by plan).
+      track("purchase_completed", { plan: planParam || null });
+      // Event Pass grants access on ACTIVATION, not purchase — so it must NOT
+      // claim the plan was upgraded; it just tells the user to go activate it.
+      setBillingToast(planParam === "event_pass" ? "success_pass" : "success");
       // Refresh the profile so planLimits updates immediately
       refreshProfile?.();
       setTimeout(() => setBillingToast(null), 6000);
@@ -642,6 +650,20 @@ export default function RouteMapperLayout() {
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [tryFlush]);
+
+  // Refresh the plan when this tab regains focus. Checkout/portal now open in
+  // a NEW tab (see src/lib/checkout.js), so Stripe's success redirect lands
+  // there; this keeps the original tab's plan in sync when the user returns to
+  // it, without a manual reload. Ref-held so the listener is added once.
+  const refreshProfileRef = useRef(refreshProfile);
+  refreshProfileRef.current = refreshProfile;
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshProfileRef.current?.();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   // Trigger 3: periodic retry while queue is non-empty.
   useEffect(() => {
@@ -775,6 +797,22 @@ export default function RouteMapperLayout() {
     return v === null ? true : v === "true";
   });
   const [upgradePrompt, setUpgradePrompt] = useState(null); // null | reason string
+
+  // Funnel: the upgrade panel just opened. It renders the plan prices, so every
+  // open is a "pricing_viewed"; when it opened because a free user hit a wall we
+  // also record the specific "free_limit_hit". One effect covers every caller
+  // (stage_limit, waypoint_limit, and the proactive "browse" entry points).
+  useEffect(() => {
+    if (!upgradePrompt) return;
+    const reason =
+      upgradePrompt === UPGRADE_REASONS.stage_limit
+        ? "stage_limit"
+        : upgradePrompt === UPGRADE_REASONS.waypoint_limit
+          ? "waypoint_limit"
+          : "browse";
+    track("pricing_viewed", { reason });
+    if (reason !== "browse") track("free_limit_hit", { limit: reason });
+  }, [upgradePrompt]);
   const [billingToast, setBillingToast] = useState(null); // null | 'success' | 'cancelled'
 
   // Trip meta
@@ -2698,12 +2736,14 @@ export default function RouteMapperLayout() {
       {billingToast && (
         <div
           className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg text-white text-sm font-medium transition-all ${
-            billingToast === "success" ? "bg-green-600" : "bg-gray-500"
+            billingToast === "cancelled" ? "bg-gray-500" : "bg-green-600"
           }`}
         >
           {billingToast === "success"
             ? "✓ Payment successful — your plan has been upgraded!"
-            : "Checkout cancelled — no payment was taken."}
+            : billingToast === "success_pass"
+              ? "✓ Event pass purchased — activate it in Account when your event begins."
+              : "Checkout cancelled — no payment was taken."}
         </div>
       )}
 

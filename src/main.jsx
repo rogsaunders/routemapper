@@ -7,6 +7,9 @@ import "./index.css";
 import "leaflet/dist/leaflet.css";
 import { AuthProvider } from "./auth/AuthProvider";
 import { Sentry } from "./lib/sentry.js";
+import { initAnalytics } from "./lib/analytics";
+
+initAnalytics();
 
 import { registerSW } from "virtual:pwa-register";
 registerSW({ immediate: true });

@@ -4,6 +4,7 @@ import { useAuth } from "./AuthProvider";
 import { useNavigate } from "react-router-dom";
 import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
+import { track } from "../lib/analytics";
 
 const isBeta = import.meta.env.VITE_BETA_MODE === "true";
 
@@ -104,6 +105,12 @@ export default function SignIn() {
         console.log("SIGN UP RESPONSE:", { data, error });
 
         if (error) throw error;
+
+        // Funnel: account created. Deep-linked plan (if any) tells us intent.
+        track("sign_up_completed", {
+          method: "email",
+          intended_plan: localStorage.getItem(PENDING_PLAN_KEY) || null,
+        });
 
         setMsg(
           "Account created. Please check your email to confirm your account.",

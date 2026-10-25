@@ -1,5 +1,7 @@
 # Standalone Travel Mode App — Scoping & Build Plan
 
+> **Design record (June 2026).** Phases 0–2 are live at go.routemapper.net. For the current system see [architecture.md](architecture.md) §2.
+
 **Status:** Scoped 2026-06-21. Phases 0 ✅, 1 ✅, 2 ✅ landed (PR #78);
 Netlify project `standalonetravel` + `go.routemapper.net` DNS wired ✅.
 Remaining: merge PR, confirm prod build settings, then the deferred

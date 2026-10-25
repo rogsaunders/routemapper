@@ -149,28 +149,29 @@ Each stage has its own subfolder containing the `.json` file.
 
 | **ID** | **Label** | **Category** | **File** |
 | --- | --- | --- | --- |
-| `note` | Note | Note | `note.svg` |
+| `left` | Left | Nav | `left.svg` |
+| `right` | Right | Nav | `right.svg` |
+| `keep_l` | Keep Left | Nav | `keep_l.svg` |
+| `keep_r` | Keep Right | Nav | `keep_r.svg` |
+| `straight` | Straight | Nav | `straight.svg` |
+| `on_left` | On Left | Nav | `on_left.svg` |
+| `on_right` | On Right | Nav | `on_right.svg` |
+| `gate` | Gate | Nav | `gate.svg` |
+| `cattle_gate` | Cattle Gate | Nav | `cattle_gate.svg` |
+| `Railroad` | railroad | Nav | `railroad.svg` |
+| `give_way` | give_way | Nav | `give_way.svg` |
+| `caution` | Caution | Nav | `caution.svg` |
 | `danger_1` | Danger 1 | Hazard | `danger_1.svg` |
 | `danger_2` | Danger 2 | Hazard | `danger_2.svg` |
 | `danger_3` | Danger 3 | Hazard | `danger_3.svg` |
 | `bump` | Bump | Terrain | `bump.svg` |
 | `bumps` | Bumps | Terrain | `bumps.svg` |
 | `dip` | Dip | Terrain | `dip.svg` |
-| `twisty` | Twisty | Terrain | `twisty.svg` |
+| `twisty` | twisty | Terrain | `twisty.svg` |
 | `ruts` | Ruts | Terrain | `ruts.svg` |
 | `washout` | Washout | Terrain | `washout.svg` |
-| `up_hill` | Uphill | Terrain | `up_hill.svg` |
-| `down_hill` | Downhill | Terrain | `down_hill.svg` |
-| `left` | Left | Nav | `left.svg` |
-| `right` | Right | Nav | `right.svg` |
-| `keep_l` | Keep Left | Nav | `keep_l.svg` |
-| `keep_r` | Keep Right | Nav | `keep_r.svg` |
-| `straight` | Straight | Nav | `straight.svg` |
-| `gate` | Gate | Nav | `gate.svg` |
-| `cattle_gate` | Cattle Gate | Nav | `cattle_gate.svg` |
-| `Railroad` | Railroad | Nav | `railroad.svg` |
-| `give_way` | Give Way | Nav | `give_way.svg` |
-| `caution` | Caution | Nav | `caution.svg` |
+| `up_hill` | up_hill | Terrain | `up_hill.svg` |
+| `down_hill` | down_hill | Terrain | `down_hill.svg` |
 | `start` | Start | Control | `start.svg` |
 | `finish` | Finish | Control | `finish.svg` |
 | `stop` | Stop/Restart | Control | `stop.svg` |
@@ -178,8 +179,16 @@ Each stage has its own subfolder containing the `.json` file.
 | `time` | Time Control | Control | `time.svg` |
 | `fuel` | Fuel Stop | Control | `fuel.svg` |
 | `service` | Service | Control | `service.svg` |
+| `speed_25` | Speed 25 | Speed | `speed_25.svg` |
+| `speed_40` | Speed 40 | Speed | `speed_40.svg` |
+| `speed_50` | Speed 50 | Speed | `speed_50.svg` |
+| `speed_60` | Speed 60 | Speed | `speed_60.svg` |
+| `speed_80` | Speed 80 | Speed | `speed_80.svg` |
+| `speed_100` | Speed 100 | Speed | `speed_100.svg` |
+| `speed_110` | Speed 110 | Speed | `speed_110.svg` |
+| `note` | Note | Note | `note.svg` |
 
-> *This table is the source of truth. Update it whenever a new icon is added.*
+> *Generated from `src/icons/iconManifest.json` (38 icons, October 2026). The manifest is the source of truth — if they ever disagree, the manifest wins. Regenerate this table when an icon is added.*
 > 
 
 ## **How Icons Behave by Category**
@@ -189,7 +198,8 @@ Each stage has its own subfolder containing the `.json` file.
 | **Hazard** | Centred overlay, tulip dimmed | Map marker | Overlay |
 | **Terrain** | Centred overlay, tulip dimmed | Map marker | Overlay |
 | **Control** | Centred overlay, tulip dimmed | Map marker | Overlay |
-| **Nav** | Corner badge (bottom-right) | Map marker | Badge |
-| **Note** | No tulip change | Map marker | — |
+| **Nav** | Corner badge (bottom-right) — except Railroad, Give Way, On Left and On Right, which overlay | Map marker | Badge |
+| **Speed** | Centred overlay, tulip dimmed | Map marker | Overlay |
+| **Note** | Corner badge | Map marker | Badge |
 
 ---

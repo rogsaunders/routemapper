@@ -300,7 +300,7 @@ Designed for rally co-drivers but equally useful for walkers, cyclists, motorbik
 - Tap **Travel** in the mode picker at the top of the app (or the bottom tab bar on phone / iPad-portrait), or
 - Go directly to **[app.routemapper.net/travel](https://app.routemapper.net/travel)**
 
-You'll see the source picker — a single big **📂 Load roadbook (ZIP or JSON)** button.
+You'll see the source picker — a single big **📂 Load roadbook (ZIP, JSON or GPX)** button.
 
 ### Loading a roadbook
 
@@ -308,10 +308,31 @@ Travel Mode accepts:
 
 - A **RouteMapper export ZIP** — the same ZIP that's generated when a stage ends. Travel Mode reads `Source/stage.json` for the roadbook structure, `trackPoints` for along-track distance, and (optionally) `Printable/roadbook.docx` for any text edits you've made (see below).
 - A **bare `stage.json`** — extracted from a ZIP, or shared as a single file.
+- A **bare `.gpx` track** — e.g. a Rally Navigator export, or a GPX from any other tool. Travel Mode runs the track through the same roadbook engine RouteMapper uses when you end a stage, generating real turn-by-turn rows and tulips rather than just a bare line on a map. The stage title is taken from the GPX file name, and the start marker is set at the track's first point.
 
 Older export layouts (with `*_stage.json` at the top level) also work — Travel Mode falls back automatically.
 
+### Head to the start
+
+Before you start driving, Travel Mode shows a **"Head to the start"** screen — a map centred on the stage's recorded start point (with the opening stretch of the route drawn on it) and a live proximity readout:
+
+| Status | Meaning |
+|--------|---------|
+| Waiting for GPS… | No fix yet |
+| Heading to start | Far from the start |
+| Approaching start | Getting closer |
+| Almost there | Very close |
+| **AT START** | Within the trigger radius |
+
+The distance-and-direction line (e.g. *"2.4 km · ↗ NE"*) updates live as you move. If voice readout is on, Travel Mode announces *"At start. Ready to begin."* the moment you cross into range.
+
+Tap **I'm at the start — Begin driving** (it turns green and pulses once you're actually in range, but nothing forces you to wait for that) to enter the main roadbook view, or **← Back to roadbook picker** to load a different stage instead.
+
+This screen is skipped automatically for older stages that don't have a recoverable start position — you'll drop straight into the roadbook view.
+
 ### What you'll see
+
+The roadbook list (shown below) sits next to — or under, on a phone — the live route map described in the next section.
 
 ```
 ┌─────────────────────────────────────────┐
@@ -332,6 +353,20 @@ Older export layouts (with `*_stage.json` at the top level) also work — Travel
 
 The current row is highlighted in amber with a left rail. As you approach it, the **next: X km** distance counts down. The row auto-scrolls to stay centred even if you've manually scrolled away.
 
+### Live route map
+
+Alongside the roadbook list, Travel Mode shows a live map: your recorded track (the travelled section faded, the stretch ahead bold), your current position and heading as a coloured arrow, the next waypoint as a numbered amber marker, and every other row as a small tappable dot — tap one to jump the roadbook straight to that row.
+
+- **🗺 toggle** (header bar) — show or hide the map. On phones it sits above the roadbook list and can be collapsed to give the list more room; on iPad / wide screens it's a persistent side panel. Hidden automatically if the loaded stage has no GPS track to draw.
+- **Map style** (top-right button on the map) — cycles 🛰 **Satellite** → 🗺 **Street** → ⛰ **Topo** → ▨ **Vector** (no imagery, just the route line — works fully offline). Your last choice is remembered.
+- **North-up / track-up** (compass button, top-left) — tap to rotate the map so your direction of travel points up, matching the view through the windscreen, rather than fixed north-up. Tap again to switch back. Off (north-up) by default.
+- **Follow / whole-stage view, and recenter** (bottom-right button) — while following, the map keeps you and the next waypoint in frame. Tap to switch to a whole-stage overview instead. Drag or pinch-zoom the map at any time to look around freely — the button then reads **Recenter**; tap it to snap back to following your position.
+- **On-route / off-route badge** (bottom-left) — turns amber with an offset distance (e.g. *"⚠ Off route · 145 m"*) when you're more than 100 m from the recorded line; your position dot turns amber too.
+
+#### Offline map tiles
+
+If a stage runs through a low-signal area, open **⚙️ Settings → 🗺 Offline map** while you still have a connection and tap **⬇ Save for offline**. Travel Mode downloads map tiles for a corridor around the whole recorded route at your currently-selected map style, so the map backdrop keeps working with no signal. A progress bar shows tiles downloaded; tap **Cancel** to stop partway. Downloaded tiles are kept for about 30 days, then need refreshing (**↻ Refresh offline tiles**). The vector-only (▨) style always works offline regardless — it's just the route line, with no map image underneath.
+
 ### Auto-advance
 
 Travel Mode advances the current row automatically as you drive past each waypoint. The trigger is GPS proximity — when you enter the configured radius (default 30 m) of the next row's recorded position, it advances.
@@ -351,11 +386,11 @@ If you drive off the recorded route by more than 100 m, the distance switches to
 
 ### Voice readout
 
-Tap the **🔊** button in the header (green when on, grey when off) to toggle voice readout. When enabled, the device speaks each row as it becomes current:
+Tap the **🔊** button in the header (green when on, grey when off) to toggle voice readout. When enabled, the device speaks the upcoming instruction as soon as you clear the previous waypoint — naming the turn and how far you have to go to reach it:
 
-> *"Keep left. Onto Forbes Road. Then 0.4 to the next."*
+> *"Next. Turn left. In 0.4 kilometres. Onto Forbes Road."*
 
-The announcement is composed from the icon/event word, your POI note (if it adds information beyond the icon), and the distance to the next row. Voice format defaults are tuned for rally navigation but the setting persists across sessions.
+The announcement leads with the icon/event word (turned into a natural phrase, e.g. "turn left" rather than just "left"), then the distance to reach that row — not the leg beyond it — then your POI note, if it adds information the icon word doesn't already give. A short **settle delay** (default 2.5 s, adjustable in Settings) waits a beat after you clear a waypoint before speaking, so the next call-out doesn't land the instant you pass a point. Voice format defaults are tuned for rally navigation but the setting persists across sessions.
 
 **iOS Safari first-time setup:** the very first speech announcement after page load needs a user gesture. Tapping the 🔊 button (which plays a short *"Voice ready"* priming utterance) handles this — subsequent auto-advance announcements then play without further interaction.
 
@@ -392,8 +427,15 @@ The **⚙️** button in the header opens the settings panel:
 - **Trigger radius** — 5–100 m (default 30 m). Larger values fire the advance earlier; smaller values fire later
 - **Manual override pause** — 10–120 s (default 30 s). After tapping ◀ ▶ or a row, auto-advance pauses for this long before resuming
 - **🔊 Voice readout** — on/off plus the **Test voice** button
+- **Delay before next instruction** — 0–6 s (default 2.5 s). How long voice readout waits after you clear a waypoint before announcing the next one
+- **🛠 Show diagnostics** — overlays live GPS, track offset, and auto-advance state on screen. Off by default; useful when troubleshooting why the current row isn't keeping up with your position — see [Diagnostics](#diagnostics) below
+- **🗺 Offline map** — pre-download this stage's map tiles for signal-free driving — see [Offline map tiles](#offline-map-tiles) above
 
 All settings persist across sessions in localStorage.
+
+### Diagnostics
+
+For troubleshooting reports of the current row falling behind your actual position, turn on **🛠 Show diagnostics** in Settings. A small overlay appears (top-right) showing exactly what the auto-advance logic is acting on: GPS accuracy and speed, your perpendicular offset from the recorded track (and whether that counts as off-track), which distance method is active (along-track / passed / straight-line), remaining distance to the current row, your track index versus the target row's, and the row/pause/override state. Purely observational — it changes no behaviour, and is off by default.
 
 ### Plan gating
 
@@ -407,6 +449,8 @@ The on-screen **Travel** tab is visible to all logged-in users including Guest M
 - **Mount your device** within easy reach (or eye-line if solo with voice readout on) — handlebar mount for cyclists / motorbike riders, dashboard cradle for drivers, armband or pocket for walkers / trekkers.
 - **Test the trigger radius on your first stage** — 30 m default is good for typical recon driving, but on fast open roads 50–60 m gives more reading time. For walkers / cyclists, dial it down to 10–15 m so the row advances closer to the actual point.
 - **Use 🔊 voice with Bluetooth audio** — engine noise / wind / headwind makes speakerphone unreliable; a headset or in-helmet audio is far clearer.
+- **Try track-up while driving** — tap the compass button (top-left of the map) to rotate the view so the road ahead points up. Flip back to north-up any time.
+- **Pre-cache tiles before you lose signal** — Settings → 🗺 Offline map, tap Save for offline while you still have a connection.
 - **Edit the DOCX before the event**, then save and re-zip ONCE. Re-exporting from RouteMapper Stage History wipes your DOCX edits.
 
 ---
@@ -521,7 +565,7 @@ Current prices at [routemapper.net/#pricing](https://routemapper.net/#pricing). 
 
 ## Your Data & Privacy
 
-- GPS tracks and waypoints are stored in our cloud database (Supabase, US region) when you have an account. Guest Mode keeps everything on your device.
+- GPS tracks and waypoints are stored in our cloud database (Supabase, Sydney, Australia region) when you have an account. Guest Mode keeps everything on your device.
 - We use this data only to provide the service. We don't sell it and we don't share it with third parties beyond the infrastructure providers needed to run the app.
 - Crash reports are collected via Sentry — error details and device info only, no personal data.
 - Full policy: [routemapper.net/privacy.html](https://routemapper.net/privacy.html).

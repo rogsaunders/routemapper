@@ -245,4 +245,3 @@ A Capacitor 8 build was brought to a working state in January 2026 (native geolo
 | Editor bundle ≈2 MB in one chunk | Slower first load on poor connections | Travel and Review are already lazy-loaded |
 | Legacy tables (`sections`, `waypoints`) and files (`ReplayRoute.jsx`, `replay_route.jsx`, Google Maps dependency, `tulipRederer.js`) | Clutter | Safe to remove after confirmation |
 | Library `download_count` not incremented | Metric gap | Needs a small RPC or function |
-| Sign-in screen text still says "private beta" | Inconsistent with public launch | Copy change |

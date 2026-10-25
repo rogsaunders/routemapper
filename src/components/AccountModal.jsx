@@ -354,7 +354,7 @@ export default function AccountModal({
               <p className="mt-1 text-xs text-red-600">Invalid phone number.</p>
             )}
             <p className="mt-1 text-xs text-gray-500">
-              Used for SMS / 2FA, emergency contact, and support.
+              Used only for account and support contact — never marketing.
             </p>
           </div>
 

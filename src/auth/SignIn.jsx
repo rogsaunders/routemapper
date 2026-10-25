@@ -195,7 +195,7 @@ export default function SignIn() {
                 autoComplete="tel"
               />
               <p className="mt-1 text-xs text-gray-500">
-                Used for SMS / 2FA, emergency contact, and support.
+                Used only for account and support contact — never marketing.
               </p>
             </div>
           )}

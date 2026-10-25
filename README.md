@@ -1,12 +1,30 @@
-# React + Vite
+# RouteMapper
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Record a route, generate a professional roadbook, and follow it live.
 
-Currently, two official plugins are available:
+- **App:** [app.routemapper.net](https://app.routemapper.net) — Record, Review and Travel modes
+- **RouteMapper Travel:** [go.routemapper.net](https://go.routemapper.net) — standalone roadbook reader and Route Library
+- **Website:** [routemapper.net](https://routemapper.net)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Documentation
 
-## Expanding the ESLint configuration
+Start with [docs/README.md](docs/README.md). The main documents:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- [Specification](docs/specification.md) — what RouteMapper is and does
+- [Architecture](docs/architecture.md) — how it is built
+- [Workflow](docs/route-mapper-workflow.md) — using it in the field
+- [User Guide](docs/user-guide.md)
+- [Development workflow](DEVELOPMENT.md)
+
+## Running locally
+
+```bash
+npm install
+npm run dev          # editor app on https://localhost:5173
+npm run dev:travel   # standalone Travel app on https://localhost:5174
+npm run build        # editor → dist/
+npm run build:travel # Travel → dist-travel/
+npm run lint
+```
+
+HTTPS is used locally because geolocation and speech require a secure context. Environment variables are listed in `.env.example`.

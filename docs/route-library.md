@@ -1,5 +1,7 @@
 # Route Library — Scoping & Build Plan
 
+> **Design record (June 2026).** Phase A (free catalogue, author submission, admin review) is live. Phases B–D are not yet built. Current state: [architecture.md](architecture.md) §7.
+
 **Name:** "Route Library" (decided 2026-06-22).
 
 **Status:** Scoped 2026-06-22. **Phase A started** (foundation: schema +
@@ -7,7 +9,7 @@ content policy) — see §11/§15. Captures the MEMORY strategic item "Route
 store with 60/40 revenue share" (flagged 2026-05-29) and the 2026-06-22
 design discussion. Sibling to
 [travel-standalone-app.md](travel-standalone-app.md) and
-[waypoint-activation.md](waypoint-activation.md).
+*waypoint-activation* (a planned design note, not yet written).
 
 ---
 
@@ -38,7 +40,7 @@ vehicle — see §4 and the decision in §12 to keep basic Travel **free**.
 - In-app route *editing* of purchased routes (download → open in editor as
   normal).
 - Event conducting / checkpoints / results (already out of scope per
-  waypoint-activation.md; overlaps here but stays separate).
+  the planned waypoint-activation note; overlaps here but stays separate).
 - Social features beyond ratings/reviews (following authors, comments).
 
 ---
@@ -59,7 +61,7 @@ tractable:
 | Server logic | Netlify Functions (validation, signed-URL issuance, payout split) |
 | File validation | Reuse the existing parser/normaliser from `src/travel/hooks/useRoadbook.js` (extracted into a shared, server-runnable module) |
 | Preview thumbnails | `src/export/staticMapRenderer.js` (pure canvas — can render a static map at submission) |
-| Activity taxonomy | The **Activity + sub-type** vocabulary from waypoint-activation.md |
+| Activity taxonomy | The **Activity + sub-type** vocabulary from the planned waypoint-activation note (not yet written) |
 
 No new database vendor, no new payments vendor.
 

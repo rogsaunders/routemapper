@@ -1,5 +1,7 @@
 # Drive Mode — Architecture (MVP)
 
+> **Design record (May 2026).** Drive Mode was renamed **Travel Mode** in June 2026 and has since gained a live map, offline tiles, GPX import and more. For the current system see [architecture.md](architecture.md) §3.4.
+
 **Status:** Approved 2026-05-23. Implementation begins at Milestone 1 (skeleton). See [Phase 2 plan](#milestones) for the 8–12 week breakdown.
 
 This document captures the architectural decisions that the design dialog converged on. It is intentionally short. Anything not decided here is deferred to Phase 3.

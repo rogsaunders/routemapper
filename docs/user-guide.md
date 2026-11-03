@@ -310,7 +310,7 @@ Travel Mode accepts:
 
 - A **RouteMapper export ZIP** — the same ZIP that's generated when a stage ends. Travel Mode reads `Source/stage.json` for the roadbook structure, `trackPoints` for along-track distance, and (optionally) `Printable/roadbook.docx` for any text edits you've made (see below).
 - A **bare `stage.json`** — extracted from a ZIP, or shared as a single file.
-- A **bare `.gpx` track** — e.g. a Rally Navigator export, or a GPX from any other tool. Travel Mode runs the track through the same roadbook engine RouteMapper uses when you end a stage, generating real turn-by-turn rows and tulips rather than just a bare line on a map. The stage title is taken from the GPX file name, and the start marker is set at the track's first point.
+- A **`.gpx` file** — e.g. a Rally Navigator export, or a GPX from any other tool. Travel Mode builds a real turn-by-turn roadbook with tulips rather than just a line on a map. How the rows are built depends on the kind of file — see [GPX files: recorded tracks and drawn routes](#gpx-files-recorded-tracks-and-drawn-routes). The stage title is taken from the GPX file name, and the start marker is set at the track's first point.
 
 Older export layouts (with `*_stage.json` at the top level) also work — Travel Mode falls back automatically.
 
@@ -470,7 +470,7 @@ If you have an active stage in progress (Record mode), Review opens on that one.
 
 ### What you'll see
 
-A split view: map on the left, roadbook list on the right. The sub-header above carries a **stage picker** (active stage + every historical stage), a **Driver / Raw view toggle**, a **map source toggle** (OSM / Terrain / Satellite), and **Back** to return to Record.
+A split view: map on the left, roadbook list on the right. The sub-header above carries a **stage picker** (active stage + every historical stage), a **Driver / Raw view toggle**, a **map source toggle** (OSM / Terrain / Satellite), **Open GPX** (view a GPX file from your device — see [Open a GPX file](#open-a-gpx-file)), and **Back** to return to Record.
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -516,8 +516,35 @@ The dropdown in the sub-header lists every stage you have access to:
 
 If you're already on `/review` and switch to a different historical stage via the picker, the map automatically re-fits to the new route's bounds.
 
+### Open a GPX file
+
+Review Mode can also open a GPX file straight from your device — for example a route you drew in Rally Navigator (RN) and exported as an OpenRally or Plain GPX.
+
+1. In Review, tap **Open GPX** in the sub-header (it's also offered on the "Nothing to review yet" screen).
+2. Choose the `.gpx` file.
+3. It appears in the stage picker as **📂 Imported GPX — (view only)**, with the map and roadbook side by side as usual.
+
+What to expect:
+
+- **View only.** The file is opened in memory. Nothing is saved to Stage History, row editing is switched off, and it's gone when you leave Review. Open it again any time.
+- **No Avg Speed panel.** GPX files carry no timestamps, so speeds can't be calculated.
+- **The roadbook is regenerated.** RouteMapper rebuilds the rows and tulips from the route geometry. Notes and icons you added in Rally Navigator are not carried over. For a drawn route the tulips and distances match Rally Navigator's.
+- **Drawn routes show numbered markers** on the map, one per waypoint row. Tap a marker to select its row, or a row to fly to its marker.
+
+See [GPX files: recorded tracks and drawn routes](#gpx-files-recorded-tracks-and-drawn-routes) for how the two kinds of file are handled.
+
+### GPX files: recorded tracks and drawn routes
+
+The same GPX import is used by Review Mode (**Open GPX**), Travel Mode (**Load roadbook**) and Route Library submissions. RouteMapper looks at the file and picks one of two methods:
+
+- **Recorded track** (a dense GPS track with a point every few metres, such as a RouteMapper or RN recording) — turns are detected from the track geometry, exactly as when you end a stage.
+- **Drawn route** (a route plotted by hand in Rally Navigator, with just a handful of points joined by straight lines) — there's too little geometry to detect turns from, so **each waypoint in the file becomes one roadbook row**. Distances are Rally Navigator's own cumulative distances (or measured along the line if the file doesn't include them), and each tulip is drawn from the direction of the route legs either side of the waypoint. The first waypoint becomes **Start** and the last becomes **Finish**. Gentle bends of about 8° or more are shown as *Bear left / Bear right*.
+
+Either way, the title comes from the file name. A file named like an export (`RouteMapper_<Stage>_<date>_route.gpx`) shows just the stage part.
+
 ### Tips for organisers
 
+- **Check a Rally Navigator route here first.** Open the exported GPX in Review (**Open GPX**) and compare the rows, distances and tulips with RN before you hand the route out.
 - **Default to Driver view.** The navigator's printed roadbook is the Driver view, so that's the one to verify. Flip to Raw only if a specific tulip looks wrong.
 - **Use Satellite for tulip checks.** Switch the map source to Satellite when you want to verify a tulip lines up with the actual road geometry (especially at roundabouts and forks).
 - **Tab through rows** to batch-add or fix POI notes — much faster than tapping each one.
@@ -559,6 +586,7 @@ Current prices at [routemapper.net/#pricing](https://routemapper.net/#pricing). 
 - **Microsoft Edge speech recognition** is known to fail intermittently (it uses Microsoft's service rather than Google's). If 🎙 Record returns a "service unreachable" error in Edge, try Chrome or Safari on the same machine — they use different speech services and usually work.
 - **Ad-blocking DNS** (pi-hole, NextDNS, AdGuard, Cloudflare for Families) can block the Google or Apple speech endpoints, breaking voice features network-wide. The friendly error message in Record will tell you when this is the cause.
 - **Voice features need internet** — speech-to-text runs server-side at Google or Apple. The on-screen tap-based 🎙 Record button and manual Add Waypoint flow work fully offline; only the speech-to-text step requires connectivity.
+- **Imported GPX roadbooks are regenerated** — notes, icons and edits made in another app (such as Rally Navigator) aren't carried across; rows and tulips are rebuilt from the route geometry. Review Mode opens GPX files view-only, and they can't be saved to Stage History yet.
 - **Very large stages** — recordings with 1000+ track points may save slowly on older devices.
 - **Offline cloud sync** — waypoint and track recording works fully offline; data syncs automatically when connectivity returns.
 - **Android tablets** — supported in Chrome, but glove-friendly controls are tuned for iPad. Native Android tablet polish is on the roadmap.

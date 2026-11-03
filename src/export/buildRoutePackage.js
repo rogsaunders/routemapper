@@ -28,12 +28,13 @@ import {
  *
  *   README.txt
  *   Universal/
- *     route.gpx      — combined waypoints + track (preferred for most tools)
- *     route.kml      — Google Earth and KML viewers
- *     track.gpx      — track only (fallback for picky importers)
- *     waypoints.gpx  — waypoints only (fallback for picky importers)
+ *     <base>_route.gpx      — combined waypoints + track (preferred for most tools)
+ *     <base>_route.kml      — Google Earth and KML viewers
+ *     <base>_track.gpx      — track only (fallback for picky importers)
+ *     <base>_waypoints.gpx  — waypoints only (fallback for picky importers)
  *   RallyNavigator/
- *     route.gpx      — copy of Universal/route.gpx for one-stop RN import
+ *     <base>_route.gpx      — copy of the Universal route GPX for one-stop RN import
+ *   (<base> = RouteMapper_<StageName>_<YYYY-MM-DD>, as used by Hema/Garmin/Gaia)
  *   Printable/       — when a roadbook is present
  *     roadbook.html
  *     roadbook.docx
@@ -116,7 +117,10 @@ export async function buildRoutePackage(stageInput, options = {}) {
   const dateStr = config.exportedAt.slice(0, 10);
 
   // ── README at root — the only place a casual user needs to look ──────
-  zip.file("README.txt", buildReadme(stageName, dateStr, config, roadbook));
+  zip.file(
+    "README.txt",
+    buildReadme(stageName, dateStr, config, roadbook, safeBase),
+  );
 
   // ── Universal/ — works in every modern mapping tool ──────────────────
   // route.gpx is the primary file (waypoints + track in one). Separate
@@ -124,16 +128,25 @@ export async function buildRoutePackage(stageInput, options = {}) {
   // them, until the interop validation pass tells us they can be dropped.
   const universal = zip.folder("Universal");
   const combinedGpx = exportCombinedGpx(stage, config);
-  universal.file("route.gpx", combinedGpx);
-  universal.file("track.gpx", exportUniversalTrackGpx(stage, config));
-  universal.file("waypoints.gpx", exportUniversalWaypointsGpx(stage, config));
+  // File names carry the stage identity (same `${safeBase}_…` pattern as the
+  // Hema/Garmin/Gaia files) so a file sitting alone in Downloads or in
+  // another app's import list is still recognisable.
+  universal.file(`${safeBase}_route.gpx`, combinedGpx);
+  universal.file(
+    `${safeBase}_track.gpx`,
+    exportUniversalTrackGpx(stage, config),
+  );
+  universal.file(
+    `${safeBase}_waypoints.gpx`,
+    exportUniversalWaypointsGpx(stage, config),
+  );
 
   // Google Earth KML lives under Universal/ too — a single discoverable
   // location for any KML-compatible viewer (Google Earth, ArcGIS Earth,
   // many mobile mapping apps).
   const kmlBundle = exportGoogleEarthKml(stage, config, safeBase);
   const kmlContent = Object.values(kmlBundle)[0];
-  universal.file("route.kml", kmlContent);
+  universal.file(`${safeBase}_route.kml`, kmlContent);
 
   // ── RallyNavigator/ — self-contained for RN users ────────────────────
   // Per design call: duplicate route.gpx here so RN users get a complete
@@ -141,7 +154,7 @@ export async function buildRoutePackage(stageInput, options = {}) {
   // The duplication is trivial in size; the UX win is real.
   if (config.includeRallyNav) {
     const rn = zip.folder("RallyNavigator");
-    rn.file("route.gpx", combinedGpx);
+    rn.file(`${safeBase}_route.gpx`, combinedGpx);
   }
 
   // ── Printable/ — print-ready and spreadsheet outputs ─────────────────
@@ -314,7 +327,8 @@ async function renderRoadbookMap(stage, config) {
   return { dataUrl, bytes };
 }
 
-function buildReadme(stageName, dateStr, config, roadbook) {
+function buildReadme(stageName, dateStr, config, roadbook, safeBase) {
+  const f = (suffix) => `${safeBase}_${suffix}`;
   const lines = [
     `ROUTEMAPPER STAGE EXPORT`,
     `========================`,
@@ -328,13 +342,13 @@ function buildReadme(stageName, dateStr, config, roadbook) {
     `─────────────────────────────────────────────────────────`,
     ``,
     `Rally Navigator users`,
-    `   →  RallyNavigator/route.gpx     (waypoints + track)`,
+    `   →  RallyNavigator/${f("route.gpx")}     (waypoints + track)`,
     ``,
     `Garmin, Hema, Guru Maps, Gaia GPS users`,
-    `   →  Universal/route.gpx          (waypoints + track combined)`,
+    `   →  Universal/${f("route.gpx")}          (waypoints + track combined)`,
     ``,
     `Google Earth users`,
-    `   →  Universal/route.kml`,
+    `   →  Universal/${f("route.kml")}`,
     ``,
   ];
 
@@ -368,9 +382,9 @@ function buildReadme(stageName, dateStr, config, roadbook) {
     ``,
     `Universal/ also includes alternative GPX layouts in case your`,
     `tool prefers them:`,
-    `   route.gpx       — waypoints + track combined (recommended)`,
-    `   track.gpx       — track only`,
-    `   waypoints.gpx   — waypoints only`,
+    `   ..._route.gpx       — waypoints + track combined (recommended)`,
+    `   ..._track.gpx       — track only`,
+    `   ..._waypoints.gpx   — waypoints only`,
     ``,
     `Tool-specific folders (Garmin/, Hema/, Gaia/) hold bundles`,
     `pre-organised for those products' native folder conventions.`,

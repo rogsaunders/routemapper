@@ -104,8 +104,8 @@ Tap the red **End Stage**. The app generates a roadbook, saves your data, and of
 ### 7. Check the export
 Open the ZIP and read the **`README.txt`** at the root — it tells you which file to use for which tool. The layout is:
 
-- **`Universal/`** — `route.gpx` and `route.kml` for any mapping tool (Garmin, Hema, Guru, Gaia, Google Earth)
-- **`RallyNavigator/`** — `route.gpx` bundled for Rally Navigator import
+- **`Universal/`** — `…_route.gpx` and `…_route.kml` for any mapping tool (Garmin, Hema, Guru, Gaia, Google Earth)
+- **`RallyNavigator/`** — `…_route.gpx` bundled for Rally Navigator import
 - **`Printable/`** — `roadbook.html`, `roadbook.docx`, `roadbook.csv`, plus `map.pdf` when generated
 - **`Source/`** — `stage.json` to re-import back into RouteMapper
 - **`Garmin/`, `Hema/`, `Gaia/`** — tool-specific bundles for users who prefer pre-organised file conventions
@@ -277,13 +277,15 @@ Open the HTML roadbook in any browser. It's print-friendly and works on any devi
 
 One ZIP per stage, organised by use case rather than by file type. A `README.txt` at the root tells you which file to pick:
 
-- **`Universal/`** — `route.gpx` (waypoints + track combined) and `route.kml`. Works in Garmin BaseCamp, Hema Maps, Guru Maps, Gaia GPS, Google Earth, and any modern GPX/KML viewer.
-- **`RallyNavigator/`** — `route.gpx` bundled for Rally Navigator. RN imports the polyline and waypoints cleanly.
+- **`Universal/`** — `…_route.gpx` (waypoints + track combined) and `…_route.kml`. Works in Garmin BaseCamp, Hema Maps, Guru Maps, Gaia GPS, Google Earth, and any modern GPX/KML viewer.
+- **`RallyNavigator/`** — `…_route.gpx` bundled for Rally Navigator. RN imports the polyline and waypoints cleanly.
 - **`Printable/`** — `roadbook.html` (open in any browser and print), `roadbook.docx` (edit in Word or Pages first), `roadbook.csv` (tabular view for Excel / Numbers / Sheets), and `map.pdf` when generated.
 - **`Source/`** — `stage.json` to re-import the full stage back into RouteMapper, plus `roadbook.json` and `manifest.json` for technical use.
 - **`Garmin/`, `Hema/`, `Gaia/`** — tool-specific bundles in those products' preferred folder conventions.
 
-`Universal/` also includes `track.gpx` and `waypoints.gpx` (separate variants of `route.gpx`) for any consumer that prefers them split rather than combined.
+`Universal/` also includes `…_track.gpx` and `…_waypoints.gpx` (separate variants of `…_route.gpx`) for any consumer that prefers them split rather than combined.
+
+GPX and KML files are named after the stage — e.g. `RouteMapper_20_01_Mainoru_to_Katherine_-_Stage_2_2026-07-03_route.gpx` — the same pattern the Hema, Garmin and Gaia files use, so each file stays recognisable once it leaves the ZIP.
 
 ---
 

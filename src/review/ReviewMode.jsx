@@ -44,12 +44,21 @@ import { snapWaypointsForDisplay } from "../lib/roadbook/snapWaypoints";
 import AvgSpeedPanel from "../components/AvgSpeedPanel";
 import { useAuth } from "../auth/AuthProvider";
 import {
+  parseGpxToStage,
+  generateRoadbookFromGpxStage,
+} from "../roadbook/gpxImport";
+import { markersFromPlannedRoadbook } from "../roadbook/plannedRoute";
+import {
   listSavedStages,
   loadSavedStage,
   saveStageMutation,
 } from "../lib/stageHistory";
 
 const STAGE_DRAFT_KEY = "routemapper_stage_draft_v1";
+
+// Sentinel picker value for a GPX file opened in-memory (e.g. a Rally
+// Navigator export). View-only: nothing is written to Stage History.
+const IMPORTED_ID = "__imported__";
 
 // FEATURE FLAG — historical-stage selection in Review mode.
 //
@@ -227,8 +236,69 @@ export default function ReviewMode() {
     };
   }, [selectedStageId, savedStages, userId, owner]);
 
-  // What stage we're actually rendering — active draft or historical.
-  const stage = selectedStageId == null ? draft : historicalPayload;
+  // GPX opened from disk (view-only, in memory). Track-only: Rally
+  // Navigator's <wpt>s carry no readable icons, so — as in Travel Mode —
+  // the roadbook is regenerated from the track geometry alone.
+  const [importedStage, setImportedStage] = useState(null);
+  const [importError, setImportError] = useState(null);
+  const isImported = selectedStageId === IMPORTED_ID;
+
+  const onOpenGpx = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    setImportError(null);
+    if (!file.name.toLowerCase().endsWith(".gpx")) {
+      setImportError("Please choose a .gpx file.");
+      return;
+    }
+    try {
+      const parsed = parseGpxToStage(await file.text(), file.name);
+      const m = parsed.meta || {};
+      // Built here (not in the roadbook memo) so a hand-drawn RN route
+      // gets one row per waypoint instead of going through turn detection.
+      const importedRoadbook = generateRoadbookFromGpxStage(parsed);
+      setImportedStage({
+        trackPoints: parsed.trackPoints,
+        // Map markers for a drawn route's waypoint rows (empty for a
+        // recorded track, which has none).
+        waypoints: markersFromPlannedRoadbook(importedRoadbook),
+        startGPS: parsed.trackPoints[0] ?? null,
+        importedRoadbook,
+        meta: {
+          tripName: m.tripName || "Imported GPX",
+          dayNumber: m.dayNumber,
+          routeName: m.stageName || m.title,
+        },
+      });
+      setSelectedStageId(IMPORTED_ID);
+    } catch (err) {
+      setImportError(err?.message || "Could not read that GPX file.");
+    }
+  };
+
+  const openGpxControl = (
+    <label
+      className="text-sm px-3 py-1 rounded-full font-medium text-gray-700 hover:bg-gray-100 cursor-pointer"
+      title="Open a GPX (e.g. from Rally Navigator) for viewing. Not saved."
+    >
+      Open GPX
+      <input
+        type="file"
+        accept=".gpx,application/gpx+xml"
+        className="hidden"
+        onChange={onOpenGpx}
+      />
+    </label>
+  );
+
+  // What stage we're actually rendering — active draft, imported GPX or
+  // historical.
+  const stage = isImported
+    ? importedStage
+    : selectedStageId == null
+      ? draft
+      : historicalPayload;
 
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [editingIndex, setEditingIndex] = useState(null);
@@ -285,6 +355,7 @@ export default function ReviewMode() {
   // the export pipeline uses, so what the organiser sees here matches
   // what ends up in the .docx.
   const roadbook = useMemo(() => {
+    if (stage?.importedRoadbook) return stage.importedRoadbook;
     if (!trackPoints.length && !displayedWaypoints.length) return null;
     try {
       return generateRoadbook({
@@ -359,8 +430,9 @@ export default function ReviewMode() {
   const selectedEntry = selectedStageId
     ? savedStages.find((s) => s.localId === selectedStageId)
     : null;
-  const stageSource =
-    selectedStageId == null
+  const stageSource = isImported
+    ? "imported"
+    : selectedStageId == null
       ? "active"
       : selectedEntry?.source === "supabase"
         ? "supabase"
@@ -372,6 +444,7 @@ export default function ReviewMode() {
   // guests (the autosave is local).
   const canEdit =
     !!stage &&
+    stageSource !== "imported" &&
     (stageSource !== "supabase" || !!userId);
 
   const onEditStart = (idx) => {
@@ -469,14 +542,22 @@ export default function ReviewMode() {
           <p className="mt-2 text-sm text-gray-600">
             Review mode shows a stage's roadbook side-by-side with the map.
             Start a stage in Record mode and capture some waypoints, then
-            come back here.
+            come back here — or open a GPX file (e.g. from Rally Navigator).
           </p>
-          <Link
-            to="/"
-            className="mt-4 inline-block px-4 py-2 rounded-xl bg-[#588233] text-white font-medium hover:bg-[#476a29]"
-          >
-            Go to Record
-          </Link>
+          {importError && (
+            <p className="mt-2 text-xs text-red-700">{importError}</p>
+          )}
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <Link
+              to="/"
+              className="inline-block px-4 py-2 rounded-xl bg-[#588233] text-white font-medium hover:bg-[#476a29]"
+            >
+              Go to Record
+            </Link>
+            <span className="px-4 py-2 rounded-xl border font-medium">
+              {openGpxControl}
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -505,12 +586,16 @@ export default function ReviewMode() {
                 onChange={(e) => {
                   const v = e.target.value;
                   setSelectedStageId(v === "__active__" ? null : v);
-                }}
-                className="text-sm px-2 py-1 rounded-lg border bg-white max-w-[24rem]"
+                }}                className="text-sm px-2 py-1 rounded-lg border bg-white max-w-[24rem]"
                 aria-label="Stage to review"
               >
                 {draft && (
                   <option value="__active__">● Active stage{draft.tripName ? ` — ${draft.tripName}` : ""}</option>
+                )}
+                {importedStage && (
+                  <option value={IMPORTED_ID}>
+                    📂 Imported GPX — {importedStage.meta.routeName || "file"} (view only)
+                  </option>
                 )}
                 {savedStages.length > 0 && (
                   <optgroup label={draft ? "History" : "Saved stages"}>
@@ -600,6 +685,7 @@ export default function ReviewMode() {
                 </option>
               ))}
             </select>
+            {openGpxControl}
             <Link
               to="/"
               className="text-sm px-3 py-1 rounded-full font-medium text-gray-700 hover:bg-gray-100"
@@ -616,7 +702,26 @@ export default function ReviewMode() {
             collapses if the user wants it out of the way. Lives
             inside the sticky sub-header so it stays in reach as the
             roadbook list scrolls. */}
-        {stage && (
+        {importError && (
+          <div className="px-3 pb-2 text-xs text-red-700">
+            {importError}{" "}
+            <button
+              type="button"
+              onClick={() => setImportError(null)}
+              className="underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+        {isImported && (
+          <div className="px-3 pb-2 text-xs text-amber-800 bg-amber-50 border-t border-amber-200 py-1">
+            Imported GPX — view only, not saved. Roadbook is regenerated from
+            the track; Rally Navigator’s own notes and icons aren’t carried
+            over. Avg Speed is unavailable (GPX has no timestamps).
+          </div>
+        )}
+        {stage && !isImported && (
           <div className="px-3 pb-2">
             {/* Pass the currently-displayed roadbook rows (driver view
                 by default, raw view when toggled) so the panel's "From

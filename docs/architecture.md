@@ -61,7 +61,7 @@ Both apps share one `src/` tree. A shared `netlify.toml` serves both Netlify pro
 | Path | Responsibility |
 |---|---|
 | `src/RouteMapperLayout.jsx` | Record mode: GPS, waypoint capture, stage lifecycle, controls (≈4,400 lines) |
-| `src/roadbook/` | Roadbook engine — track preprocessing, turn detection, classification, waypoint merging, tulip rendering, HTML roadbook, GPX import. Shared by both apps |
+| `src/roadbook/` | Roadbook engine — track preprocessing, turn detection, classification, waypoint merging, tulip rendering, HTML roadbook, GPX import (including drawn-route mode, `plannedRoute.js`). Shared by both apps |
 | `src/export/` | Export package: ZIP assembly, per-tool exporters, map PDF, static map renderer |
 | `src/review/` | Review mode |
 | `src/travel/` | Travel mode: roadbook loader, GPS advance state machine, voice readout, live map, offline tile cache |
@@ -109,7 +109,7 @@ flowchart TD
 | Score and filter | `roadbookFilter.js` | Confidence per event; **Driver view** keeps events ≥ 0.85 (strong derived turns ≥ 0.75) and clusters noise; **Raw view** keeps everything |
 | Render tulips | `tulipRenderer.js` | SVG tulip from bearing in/out and angle; icons overlay (hazard/terrain/control) or badge (nav) |
 
-The engine is deterministic and runs client-side. It is re-run at export time from track-snapped waypoints, so the printed roadbook, the GPX files and Review mode always agree. Travel mode also runs it on imported plain GPX tracks.
+The engine is deterministic and runs client-side. It is re-run at export time from track-snapped waypoints, so the printed roadbook, the GPX files and Review mode always agree. Travel mode and Review mode also run it on imported recorded GPX tracks. A hand-drawn route (a sparse polyline, typically from Rally Navigator) is too coarse for turn detection, so `plannedRoute.js` builds one row per waypoint instead, using the file's own distances and bearings taken from the route legs.
 
 ### 3.3 Export package (`src/export/buildRoutePackage.js`)
 

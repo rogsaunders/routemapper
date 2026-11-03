@@ -73,6 +73,8 @@ Best done on a laptop or iPad after the day's recording.
 5. Use the **Average speed** panel between waypoints to set target times for controls.
 6. Re-export the stage from **History → ↓ Re-export ZIP** so the files include your edits.
 
+> Optional: to check a route drawn in Rally Navigator, export it as a GPX and open it with **Open GPX** in Review. It opens view-only and is not saved; the roadbook is rebuilt from the route, so compare its rows, distances and tulips with Rally Navigator's.
+
 > Optional: final wording can be polished in `Printable/roadbook.docx`. Travel mode picks up those edited notes if the DOCX is saved back into the ZIP. Do this **last** — re-exporting from History regenerates the DOCX and overwrites edits.
 
 ## 5. Distribute

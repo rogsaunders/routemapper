@@ -126,13 +126,14 @@ A split screen with the map on one side and the roadbook on the other, designed 
 - Switch between street, terrain and satellite imagery to check that each tulip matches the real corner.
 - Edit notes directly in the list (Tab moves to the next row) or change icons in place.
 - Works on the stage just recorded or any saved stage; edits sync to the cloud for signed-in users.
+- **Open GPX** shows a GPX file from another tool (for example a route drawn in Rally Navigator) view-only, with the same map and roadbook layout. Nothing is saved.
 - An average-speed panel reports moving speed and stationary time between any two waypoints — useful for setting time controls.
 
 ### 6.5 Travel mode — following the roadbook
 
 Travel mode is the in-vehicle reader. It is available in the main app and as **RouteMapper Travel**, a separate, much smaller installable app at go.routemapper.net that needs no account — ideal for entrants or co-drivers who only need to follow a route.
 
-- **Loads** a RouteMapper export ZIP, its `stage.json`, or a plain GPX track from any other tool (including Rally Navigator), which it runs through the same roadbook engine.
+- **Loads** a RouteMapper export ZIP, its `stage.json`, or a GPX file from any other tool (including Rally Navigator). A recorded track is run through the same roadbook engine; a hand-drawn route becomes one row per waypoint, using Rally Navigator's own distances.
 - **Head to the start** — a pre-start screen shows the start point on a map with live distance and direction, and announces when you arrive.
 - **Auto-advance** — the current row moves on automatically as the vehicle passes each waypoint (default trigger radius 30 m, adjustable 5–100 m). Manual back/forward and pause are always available.
 - **Along-track distance** — "distance to next" follows the recorded road, matching the printed roadbook's figures. More than 100 m off the route, the display switches to straight-line distance and flags *off-route*.
@@ -153,8 +154,8 @@ One ZIP per stage, organised by *what you want to do* rather than by file type. 
 
 | Folder | Contents | Use it with |
 |---|---|---|
-| `Universal/` | `route.gpx` (track + waypoints), `route.kml`, plus separate track and waypoint GPX files | Any GPX/KML tool — Garmin BaseCamp, Hema, Guru Maps, Gaia GPS, Google Earth |
-| `RallyNavigator/` | `route.gpx` with OpenRally extensions (distances, headings, tulips) | Rally Navigator — import validated on real recce data, May 2026 |
+| `Universal/` | `…_route.gpx` (track + waypoints), `…_route.kml`, plus separate track and waypoint GPX files — all named after the stage | Any GPX/KML tool — Garmin BaseCamp, Hema, Guru Maps, Gaia GPS, Google Earth |
+| `RallyNavigator/` | `…_route.gpx` with OpenRally extensions (distances, headings, tulips) | Rally Navigator — import validated on real recce data, May 2026 |
 | `Printable/` | `roadbook.html`, `roadbook.docx`, `roadbook.csv`, `map.pdf` | Print, edit in Word/Pages, open in Excel/Numbers |
 | `Source/` | `stage.json`, `roadbook.json`, `manifest.json` | Re-import into RouteMapper or Travel |
 | `Garmin/`, `Hema/`, `Gaia/` | Tool-specific bundles | Users who prefer those products' own conventions |
@@ -241,6 +242,7 @@ Guest mode and RouteMapper Travel (for following routes) are free. The Event Pas
 | Jul 2026 | GPX import into Travel (follow Rally Navigator routes) |
 | Aug 2026 | Travel live map: satellite, track-up, offline map tiles · Event Pass activation · billing security hardening |
 | Sep–Oct 2026 | Usage analytics, marketing site and intro video refresh |
+| Nov 2026 | Open GPX in Review mode · drawn-route (Rally Navigator) GPX import · GPX/KML export files named after the stage |
 
 **Now** — field hardening of Travel and Review on live recce and event data.
 

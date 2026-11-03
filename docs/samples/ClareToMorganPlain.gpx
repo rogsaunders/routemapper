@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:openrally="http://www.openrally.org/xmlschemas/GpxExtensions/v1.0.3" creator="Rally Navigator" version="1.1" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd                       http://www.openrally.org/xmlschemas/GpxExtensions/v1.0.3 openrally.xsd">
+  <wpt lat="-33.834322" lon="138.608066">
+    <ele>380</ele>
+    <name>Untitled_001</name>
+  </wpt>
+  <wpt lat="-33.466650" lon="138.591504">
+    <ele>290</ele>
+    <name>Untitled_002</name>
+  </wpt>
+  <wpt lat="-33.466671" lon="138.438697">
+    <ele>250</ele>
+    <name>Untitled_003</name>
+  </wpt>
+  <wpt lat="-33.198742" lon="138.078395">
+    <name>Untitled_004</name>
+  </wpt>
+  <wpt lat="-33.513981" lon="138.063718">
+    <ele>10</ele>
+    <name>Untitled_005</name>
+  </wpt>
+  <wpt lat="-33.925569" lon="137.631783">
+    <ele>-10</ele>
+    <name>Untitled_006</name>
+  </wpt>
+  <wpt lat="-34.177521" lon="138.151785">
+    <ele>-10</ele>
+    <name>Untitled_007</name>
+  </wpt>
+  <wpt lat="-34.032610" lon="138.685773">
+    <ele>270</ele>
+    <name>Untitled_008</name>
+  </wpt>
+  <wpt lat="-34.193577" lon="139.051945">
+    <ele>370</ele>
+    <name>Untitled_009</name>
+  </wpt>
+  <wpt lat="-34.029849" lon="139.671830">
+    <name>Untitled_010</name>
+  </wpt>
+  <trk>
+    <name>ACTIVE LOG 001</name>
+    <trkseg>
+      <trkpt lat="-33.834322" lon="138.608066">
+        <ele>380</ele>
+      </trkpt>
+      <trkpt lat="-33.466650" lon="138.591504">
+        <ele>290</ele>
+      </trkpt>
+      <trkpt lat="-33.466671" lon="138.438697">
+        <ele>250</ele>
+      </trkpt>
+      <trkpt lat="-33.447450" lon="138.430327">
+        <ele>250</ele>
+      </trkpt>
+      <trkpt lat="-33.198742" lon="138.078395"/>
+      <trkpt lat="-33.182936" lon="138.017584">
+        <ele>-10</ele>
+      </trkpt>
+      <trkpt lat="-33.513981" lon="138.063718">
+        <ele>10</ele>
+      </trkpt>
+      <trkpt lat="-33.925569" lon="137.631783">
+        <ele>-10</ele>
+      </trkpt>
+      <trkpt lat="-34.177521" lon="138.151785">
+        <ele>-10</ele>
+      </trkpt>
+      <trkpt lat="-34.032610" lon="138.685773">
+        <ele>270</ele>
+      </trkpt>
+      <trkpt lat="-34.193577" lon="139.051945">
+        <ele>370</ele>
+      </trkpt>
+      <trkpt lat="-34.029849" lon="139.671830"/>
+    </trkseg>
+  </trk>
+</gpx>

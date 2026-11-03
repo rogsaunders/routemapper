@@ -80,8 +80,8 @@ Best done on a laptop or iPad after the day's recording.
 | To | Give them | From the ZIP |
 |---|---|---|
 | Entrants following on a phone or iPad | The ZIP (or its `stage.json`) — opened in RouteMapper Travel, free, no account | whole ZIP |
-| Entrants using Rally Navigator | `route.gpx` | `RallyNavigator/` |
-| Entrants with Garmin, Hema, Gaia or Google Earth | the tool's folder, or `route.gpx` / `route.kml` | `Garmin/`, `Hema/`, `Gaia/`, `Universal/` |
+| Entrants using Rally Navigator | `…_route.gpx` | `RallyNavigator/` |
+| Entrants with Garmin, Hema, Gaia or Google Earth | the tool's folder, or `…_route.gpx` / `…_route.kml` | `Garmin/`, `Hema/`, `Gaia/`, `Universal/` |
 | Printing the roadbook | `roadbook.html` (print from a browser) or `roadbook.docx` | `Printable/` |
 | Officials and spreadsheets | `roadbook.csv`, `map.pdf` | `Printable/` |
 | The public, later | Submit the route to the **Route Library** (approved authors) | whole ZIP |

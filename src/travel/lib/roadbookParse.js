@@ -17,8 +17,10 @@
 
 import JSZip from "jszip";
 import { extractDocxNotePatches, applyNotePatches } from "./docxPatch";
-import { parseGpxToStage } from "../../roadbook/gpxImport";
-import { generateRoadbook } from "../../roadbook/roadbookEngine";
+import {
+  parseGpxToStage,
+  generateRoadbookFromGpxStage,
+} from "../../roadbook/gpxImport";
 
 const STAGE_JSON_LEGACY = /_stage\.json$/;
 const DOCX_PATH_PRIMARY = "Printable/roadbook.docx";
@@ -218,10 +220,7 @@ export async function parseRouteFile(file) {
     // still returns them (schema documentation + waypoint count) for future use.
     const stage = parseGpxToStage(await file.text(), file.name);
     parsed = {
-      roadbook: generateRoadbook({
-        trackPoints: stage.trackPoints,
-        meta: stage.meta,
-      }),
+      roadbook: generateRoadbookFromGpxStage(stage),
       trackPoints: stage.trackPoints,
       meta: stage.meta,
       // The first track point IS the recorded start line. Without this the

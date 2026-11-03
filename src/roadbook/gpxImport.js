@@ -30,13 +30,19 @@
 // most of that is base64 tulip bitmaps we never use. Streaming the tags we care
 // about avoids inflating all that base64 into DOM nodes.
 
+import { generateRoadbook } from "./roadbookEngine";
+import { isPlannedRoute, generatePlannedRoadbook } from "./plannedRoute";
+
 const NUM = "[-+]?\\d*\\.?\\d+";
+// Both forms occur: <trkpt lat lon>…</trkpt> and the self-closing
+// <trkpt lat lon/> that RN writes for points with no <ele>/<time> children.
+// Missing the self-closing form silently dropped points from drawn routes.
 const TRKPT_RE = new RegExp(
-  `<trkpt\\b[^>]*?\\blat="(${NUM})"[^>]*?\\blon="(${NUM})"[^>]*?>([\\s\\S]*?)<\\/trkpt>`,
+  `<trkpt\\b[^>]*?\\blat="(${NUM})"[^>]*?\\blon="(${NUM})"[^>]*?(?:\\/>|>([\\s\\S]*?)<\\/trkpt>)`,
   "g",
 );
 const WPT_RE = new RegExp(
-  `<wpt\\b[^>]*?\\blat="(${NUM})"[^>]*?\\blon="(${NUM})"[^>]*?>([\\s\\S]*?)<\\/wpt>`,
+  `<wpt\\b[^>]*?\\blat="(${NUM})"[^>]*?\\blon="(${NUM})"[^>]*?(?:\\/>|>([\\s\\S]*?)<\\/wpt>)`,
   "g",
 );
 const ELE_RE = new RegExp(`<ele>\\s*(${NUM})\\s*<\\/ele>`);
@@ -99,8 +105,14 @@ function humanise(s) {
  */
 export function metaFromFilename(filename) {
   if (!filename) return {};
+  // Strip the export decoration from `RouteMapper_<Stage>_<date>_route.gpx`
+  // style names (see makeBaseName in buildRoutePackage) so the title is just
+  // the stage, e.g. "20 01 Mainoru to Katherine - Stage 2".
   const stem = collapseRepeatedBlock(
-    String(filename).replace(/\.[^.]+$/, ""),
+    String(filename)
+      .replace(/\.[^.]+$/, "")
+      .replace(/^RouteMapper_/, "")
+      .replace(/_\d{4}-\d{2}-\d{2}(_[A-Za-z]+)*$/, ""),
   );
   if (!stem) return {};
   const m = /^(.+?)_Day(\d+)_(.+)$/.exec(stem);
@@ -134,7 +146,7 @@ export function parseGpxToStage(text, filename = "") {
     const lon = Number(m[2]);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
     const point = { lat, lon };
-    const ele = ELE_RE.exec(m[3]);
+    const ele = ELE_RE.exec(m[3] || "");
     if (ele) point.ele = Number(ele[1]);
     trackPoints.push(point);
   }
@@ -148,12 +160,22 @@ export function parseGpxToStage(text, filename = "") {
   // Waypoints: only meaningful when annotated (Open Rally export). A plain GPX
   // has bare shape-vertex <wpt>s we deliberately ignore.
   const waypoints = [];
+  // Every <wpt> in file order, annotated or not. For a hand-drawn RN route
+  // these ARE the roadbook rows (see plannedRoute.js); for a recorded track
+  // they're just shape vertices and callers ignore them.
+  const routeWaypoints = [];
   for (const m of text.matchAll(WPT_RE)) {
-    const inner = m[3];
-    if (!inner.includes("openrally:")) continue; // bare shape point — skip
+    const inner = m[3] || "";
     const lat = Number(m[1]);
     const lon = Number(m[2]);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    const dKm = OR_DISTANCE_RE.exec(inner);
+    routeWaypoints.push({
+      lat,
+      lon,
+      ...(dKm ? { distanceFromStartM: Number(dKm[1]) * 1000 } : {}),
+    });
+    if (!inner.includes("openrally:")) continue; // bare shape point — skip
 
     const distKm = OR_DISTANCE_RE.exec(inner);
     const cap = OR_CAP_RE.exec(inner);
@@ -201,7 +223,23 @@ export function parseGpxToStage(text, filename = "") {
         : null,
   };
 
-  return { trackPoints, waypoints, meta };
+  return { trackPoints, waypoints, routeWaypoints, meta };
+}
+
+/**
+ * Build the roadbook for a parsed GPX stage. A hand-drawn (sparse) route
+ * gets one row per waypoint; a dense recorded track goes through the normal
+ * turn-detection engine. Shared by Travel Mode and Review Mode.
+ */
+export function generateRoadbookFromGpxStage(stage) {
+  if (isPlannedRoute(stage.trackPoints, stage.routeWaypoints)) {
+    return generatePlannedRoadbook({
+      trackPoints: stage.trackPoints,
+      waypoints: stage.routeWaypoints,
+      meta: stage.meta,
+    });
+  }
+  return generateRoadbook({ trackPoints: stage.trackPoints, meta: stage.meta });
 }
 
 /** True for filenames/inputs we should route through the GPX importer. */

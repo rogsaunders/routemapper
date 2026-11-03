@@ -21,7 +21,7 @@ export function classifyAngle(angle) {
   return "straight"
 }
 
-function describeType(type) {
+export function describeType(type) {
   switch (type) {
     case "hairpin_right":
       return "Hairpin right"
